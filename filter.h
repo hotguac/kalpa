@@ -19,13 +19,336 @@
 
 #pragma once
 
-#include <cmath>
-#include "daisysp.h"
-#include "Utility/dsp.h"
 #include "Biquad.h"
+#include "Filters/biquad.h"
+#include "Filters/onepole.h"
+#include "Utility/dsp.h"
+#include "daisysp-lgpl.h"
+#include "daisysp.h"
+#include <cmath>
+
+using daisysp::OnePole;
+
+/*
+
+*/
+
+const int ft_undefined = 0;
+
+class Filter {
+public:
+    // enum filterType : integer { ft_undefined };
+    virtual void Init(float sampleRate, int ftype) = 0;
+    virtual void reset() = 0;
+    virtual float render(float in) = 0;
+    virtual void setFreq(float freq) = 0;
+    virtual void updateCoefficients() = 0;
+
+protected:
+    float sampleRate = 48000.f;
+    int ftype = ft_undefined;
+    float freq;
+};
+
+class LowPass : Filter {
+public:
+    enum filterType : int { ft_cytomic_svf = 1,
+        ft_daisy_onepole = 2,
+        ft_daisy_biquad = 3,
+        ft_daisy_svf = 4 };
+
+    void Init(float sampleRate, int ftype) override
+    {
+        this->sampleRate = sampleRate;
+
+        if (ftype < ft_cytomic_svf || ftype > ft_daisy_svf)
+            ftype = ft_undefined;
+
+        this->ftype = ftype;
+
+        switch (ftype) {
+        case ft_daisy_onepole:
+            onepole.Init();
+            onepole.SetFilterMode(OnePole::FILTER_MODE_LOW_PASS);
+            /* code */
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    void reset()
+    {
+        switch (ftype) {
+        case ft_cytomic_svf:
+            /* code */
+            break;
+
+        case ft_daisy_onepole:
+            /* code */
+            break;
+
+        case ft_daisy_biquad:
+            /* code */
+            break;
+
+        case ft_daisy_svf:
+            /* code */
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    float render(float in)
+    {
+        switch (ftype) {
+        case ft_cytomic_svf:
+            return in;
+            break;
+
+        case ft_daisy_onepole:
+            return in;
+            break;
+
+        case ft_daisy_biquad:
+            return in;
+            break;
+
+        case ft_daisy_svf:
+            return in;
+            break;
+
+        default:
+            return in;
+            break;
+        }
+
+        return in;
+    }
+
+    void setFreq(float freq)
+    {
+        this->freq = freq;
+        updateCoefficients();
+    }
+
+    void updateCoefficients()
+    {
+
+        switch (ftype) {
+        case ft_cytomic_svf:
+            /* code */
+            break;
+
+        case ft_daisy_onepole:
+            /* code */
+            break;
+
+        case ft_daisy_biquad:
+            /* code */
+            break;
+
+        case ft_daisy_svf:
+            /* code */
+            break;
+
+        default:
+            break;
+        }
+    }
+
+private:
+    jkoDSP::Biquad biquad;
+    OnePole onepole;
+};
+
+// Provides a set of audio filters
+class xLowpass : Filter {
+public:
+    enum filterType {
+        ft_cytomic_svf,
+        ft_onepole_lowpass1, // daisy onepole
+        ft_onepole_highpass1, // daisy onepole
+        ft_lowshelf1, // daisy biquad
+        ft_lowshelf2, // daisy svf
+        ft_lowpass1, // daisy biquad
+        ft_lowpass2, // daisy svf
+        ft_highpass1, // daisy biquad
+        ft_highpass2,
+        ft_peak1, // daisy biquad
+        ft_notch1, // daisy biquad
+        ft_bandpass1, // daisy biquad
+        ft_allpass
+    };
+
+    // sample_rate - samples per second
+    // filter_type - enum
+    void Init(float sampleRate, filterType filter_type)
+    {
+        fs = sampleRate;
+        fType = filter_type;
+        fc = 8000.f;
+        Q = 2.f;
+        gain = 1.f;
+        resonance = 0.5f;
+        bandwidth = 400.f;
+
+        reset();
+        updateCoefficients();
+    }
+
+    // sets the internal state variables to known values
+    void reset()
+    {
+        state1 = 0.f;
+        state2 = 0.f;
+
+        g = 0.f;
+        k = 0.f;
+
+        a0 = a1 = a2 = a3 = 0.f;
+        b0 = b1 = b2 = b3 = 0.f;
+    }
+
+    // in is the next sample to process, returns a filtered sample
+    float render(float in)
+    {
+        float out = in;
+
+        return out;
+    }
+
+    // Filter cutoff in hz
+    void setCutoff(float cutoff)
+    {
+        fc = daisysp::fclamp(cutoff, 10.f, 20000.f);
+        ;
+        updateCoefficients();
+    }
+
+    // Calculate the filter coefficients
+    void updateCoefficients()
+    {
+        switch (fType) {
+        case ft_allpass:
+            /* code */
+            break;
+
+        case ft_bandpass1:
+            /* code */
+            break;
+
+        case ft_cytomic_svf:
+            /* code */
+            break;
+
+        case ft_highpass1:
+            /* code */
+            break;
+
+        case ft_highpass2:
+            /* code */
+            break;
+
+        case ft_lowpass1:
+            /* code */
+            break;
+
+        case ft_lowpass2:
+            /* code */
+            break;
+
+        case ft_peak1:
+            /* code */
+            break;
+
+        case ft_lowshelf1:
+            /* code */
+            break;
+
+        case ft_lowshelf2:
+            /* code */
+            break;
+
+        case ft_onepole_highpass1:
+            /* code */
+            break;
+
+        case ft_onepole_lowpass1:
+            /* code */
+            break;
+
+        default:
+            break;
+        }
+    }
+
+    void setQ(float Q)
+    {
+        this->Q = daisysp::fclamp(Q, 0.707f, 20.f);
+    }
+
+    void setGain(float gain)
+    {
+        this->gain = gain;
+    }
+
+    void setResonance(float resonance)
+    {
+        this->resonance = resonance;
+    }
+
+    void setBandwidth(float bandwidth)
+    {
+        this->bandwidth = bandwidth;
+    }
+
+    float getQ()
+    {
+        return Q;
+    }
+
+    float getGain()
+    {
+        return gain;
+    }
+
+    float getResonance()
+    {
+        return resonance;
+    }
+
+    // Filter cutoff in hz
+    float getCutoff()
+    {
+        return fc;
+    }
+
+private:
+    float fs;
+
+    filterType fType;
+
+    float fc;
+    float Q;
+    float gain;
+    float resonance;
+    float bandwidth;
+
+    float state1;
+    float state2;
+
+    float a0, a1, a2, a3;
+    float b0, b1, b2, b3;
+
+    float g, k;
+};
 
 // Resonant low-pass filter based on Cytomic SVF.
-class Filter {
+class Cytomic_SVF {
 public:
     float sampleRate;
 

@@ -46,6 +46,8 @@ float driveB;
 float toneB;
 float volumeB;
 
+float denormal_guard = 10e-15f;
+
 Hothouse::ToggleswitchPosition sw1;
 
 DcBlock blocker;
@@ -62,15 +64,15 @@ float processA(float in)
 
     switch (hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_1)) {
     case Hothouse::TOGGLESWITCH_UP: {
-        out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB);
+        out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB, volumeB);
         break;
     }
     case Hothouse::TOGGLESWITCH_MIDDLE: {
-        out = distA.softClip(in, driveA, toneA, volumeA, driveB, toneB);
+        out = distA.softClip(in, driveA, toneA, volumeA, driveB, toneB, volumeB);
         break;
     }
     default: {
-        out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB);
+        out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB, volumeB);
         break;
     }
     }
@@ -88,15 +90,15 @@ float processB(float in)
 
     switch (hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_3)) {
     case Hothouse::TOGGLESWITCH_UP: {
-        out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB);
+        out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB, volumeB);
         break;
     }
     case Hothouse::TOGGLESWITCH_MIDDLE: {
-        out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB);
+        out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB, volumeB);
         break;
     }
     default: {
-        out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB);
+        out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB, volumeB);
         break;
     }
     }
@@ -107,6 +109,8 @@ float processB(float in)
 void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out,
     size_t size)
 {
+    denormal_guard = -denormal_guard;
+
     hw.ProcessAllControls();
 
     bypassA ^= hw.switches[Hothouse::FOOTSWITCH_1].RisingEdge();
@@ -130,35 +134,24 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out,
     float input = 0.0f;
 
     for (size_t i = 0; i < size; ++i) {
-        input = in[0][i];
+        input = in[0][i] + denormal_guard;
 
         if (bypassA && bypassB) {
             output = input;
-        }
-
-        if (bypassA) {
+        } else if (bypassA) {
             output = processB(input);
-        }
-
-        if (bypassB) {
+        } else if (bypassB) {
             output = processA(input);
-        }
+        } else if (!bypassA && !bypassB) {
 
-        if (!bypassA && !bypassB) {
-
-            // running in A->B
             if (routing_sw == Hothouse::TOGGLESWITCH_UP) {
                 output = processB(processA(input));
-            }
-
-            // running parallel
-            if (routing_sw == Hothouse::TOGGLESWITCH_MIDDLE) {
+            } else if (routing_sw == Hothouse::TOGGLESWITCH_MIDDLE) {
                 output = (processA(input) + processB(input) / 2.0F);
-            }
-
-            // running B->A
-            if (routing_sw == Hothouse::TOGGLESWITCH_DOWN) {
+            } else if (routing_sw == Hothouse::TOGGLESWITCH_DOWN) {
                 output = processA(processB(input));
+            } else {
+                output = input;
             }
         }
 

@@ -15,9 +15,12 @@
 //  You may modify and use this source code to create binary code
 //  for your own purposes, free or commercial.
 //
+#pragma once
 
 #ifndef Biquad_h
 #define Biquad_h
+
+namespace jkoDSP {
 
 enum {
     bq_type_lowpass = 0,
@@ -40,7 +43,9 @@ public:
     void setPeakGain(double peakGainDB);
     void setBiquad(int type, double Fc, double Q, double peakGainDB);
     float process(float in);
-    
+    float getFc();
+    float getGain();
+
 protected:
     void calcBiquad(void);
 
@@ -112,6 +117,16 @@ void Biquad::setQ(double Q) {
 void Biquad::setFc(double Fc) {
     this->Fc = Fc;
     calcBiquad();
+}
+
+float Biquad::getFc()
+{
+    return this->Fc;
+}
+
+float Biquad::getGain()
+{
+    return this->peakGain;
 }
 
 void Biquad::setPeakGain(double peakGainDB) {
@@ -224,6 +239,7 @@ void Biquad::calcBiquad(void) {
     }
     
     return;
+}
 }
 
 #endif // Biquad_h

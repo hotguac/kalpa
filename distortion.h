@@ -17,9 +17,9 @@
 // ### Uncomment if IntelliSense can't resolve DaisySP-LGPL classes ###
 // #include "daisysp-lgpl.h"
 
-#include "daisysp.h"
-// #include "filter.h"
 #include "Biquad.h"
+#include "daisysp.h"
+#include "filter.h"
 
 using daisysp::fmap;
 using daisysp::Mapping;
@@ -33,10 +33,10 @@ public:
     const float ls_pre_hz = 300.0f;
     const float ls_pre_gain = -6.0f;
 
-    const float lp_post_hz = 8000.0f;
-
     const float ls_post_hz = ls_pre_hz;
     const float ls_post_gain = ls_pre_gain * -0.8f;
+
+    const float lp_post_hz = 8000.0f;
 
     const float pk_post_hz = 400.f;
     const float pk_post_q = 2.f;
@@ -46,55 +46,62 @@ public:
     {
         sample_rate = samplerate;
 
-        lp_pre.setType(bq_type_lowpass);
+        lp_pre.setType(jkoDSP::bq_type_lowpass);
         lp_pre.setFc(lp_pre_hz / samplerate);
         lp_pre.setQ(0.707f);
 
-        hp_pre.setType(bq_type_highpass);
+        hp_pre.setType(jkoDSP::bq_type_highpass);
         hp_pre.setFc(hp_pre_hz / samplerate);
         hp_pre.setQ(0.707f);
 
-        ls_pre.setType(bq_type_lowshelf);
+        ls_pre.setType(jkoDSP::bq_type_lowshelf);
         ls_pre.setFc(ls_pre_hz / samplerate);
         ls_pre.setQ(0.707f);
         ls_pre.setPeakGain(ls_pre_gain);
 
-        lp_post.setType(bq_type_lowpass);
+        lp_post.setType(jkoDSP::bq_type_lowpass);
         lp_post.setFc(lp_post_hz / samplerate);
         lp_post.setQ(0.707f);
 
-        ls_post.setType(bq_type_lowshelf);
+        ls_post.setType(jkoDSP::bq_type_lowshelf);
         ls_post.setFc(ls_post_hz / samplerate);
         ls_post.setQ(0.707f);
         ls_post.setPeakGain(ls_post_gain);
 
-        pk_post.setType(bq_type_peak);
+        pk_post.setType(jkoDSP::bq_type_peak);
         pk_post.setFc(pk_post_hz / samplerate);
         pk_post.setQ(pk_post_q);
         pk_post.setPeakGain(pk_post_gain);
 
-        lp_tone.setType(bq_type_lowpass);
+        lp_tone.setType(jkoDSP::bq_type_lowpass);
         lp_tone.setFc(lp_pre_hz / samplerate);
         lp_tone.setQ(0.707f);
 
+        lp_test.Init(samplerate, LowPass::ft_daisy_onepole);
     }
 
-    float softClip(float in, float drive, float tone, float volume, float drive2, float tone2)
+    float softClip(float in, float drive, float tone, float volume, float emphasis, float bandwidth, float amount)
     {
         float out;
 
         // Bump up the signal level to drive more clipping
-        out = in * (2.f + drive * 36.f);
+        out = in;
 
         // Pre-clipping EQ
         out = lp_pre.process(out);
         out = hp_pre.process(out);
+
+        ls_pre.setFc(fmap(emphasis, 80.f, 800.f, Mapping::LOG) / sample_rate);
+        ls_pre.setPeakGain(fmap(amount, -16.f, -6.f, Mapping::LOG));
         out = ls_pre.process(out);
 
         // Our clipping function
-        out = tanh(out);
+        out = tanh(out * (2.f + drive * 36.f));
 
         // Post clip EQ
+        ls_post.setFc(ls_pre.getFc());
+        ls_post.setPeakGain(ls_pre.getGain() * -0.6f);
+
         out = ls_post.process(out);
         out = pk_post.process(out);
         
@@ -115,18 +122,21 @@ private:
     {
         return fmap(tone, 1200, 8000, Mapping::LOG);
     }
+
     float get_q(float tone)
     {
         return fmap(tone, 1.0f, 2.0f, Mapping::LINEAR);
     }
 
-    Biquad lp_pre;
-    Biquad hp_pre;
-    Biquad ls_pre;
+    jkoDSP::Biquad lp_pre;
+    jkoDSP::Biquad hp_pre;
+    jkoDSP::Biquad ls_pre;
 
-    Biquad lp_post;
-    Biquad ls_post;
-    Biquad pk_post;
+    jkoDSP::Biquad lp_post;
+    jkoDSP::Biquad ls_post;
+    jkoDSP::Biquad pk_post;
 
-    Biquad lp_tone;
+    jkoDSP::Biquad lp_tone;
+
+    LowPass lp_test;
 };
