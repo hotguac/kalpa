@@ -60,22 +60,24 @@ float processA(float in)
         return in;
     }
 
-    sw1 = hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_1);
+    out = distA.softClip(in, driveA, toneA, volumeA, driveB, toneB, volumeB);
 
-    switch (hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_1)) {
-    case Hothouse::TOGGLESWITCH_UP: {
-        out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB, volumeB);
-        break;
-    }
-    case Hothouse::TOGGLESWITCH_MIDDLE: {
-        out = distA.softClip(in, driveA, toneA, volumeA, driveB, toneB, volumeB);
-        break;
-    }
-    default: {
-        out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB, volumeB);
-        break;
-    }
-    }
+    // sw1 = hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_1);
+
+    // switch (hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_1)) {
+    // case Hothouse::TOGGLESWITCH_UP: {
+    //     out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB, volumeB);
+    //     break;
+    // }
+    // case Hothouse::TOGGLESWITCH_MIDDLE: {
+    //     out = distA.softClip(in, driveA, toneA, volumeA, driveB, toneB, volumeB);
+    //     break;
+    // }
+    // default: {
+    //     out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB, volumeB);
+    //     break;
+    // }
+    // }
 
     return out;
 }
@@ -136,24 +138,30 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out,
     for (size_t i = 0; i < size; ++i) {
         input = in[0][i] + denormal_guard;
 
-        if (bypassA && bypassB) {
+        if (bypassA) {
             output = input;
-        } else if (bypassA) {
-            output = processB(input);
-        } else if (bypassB) {
+        } else {
             output = processA(input);
-        } else if (!bypassA && !bypassB) {
-
-            if (routing_sw == Hothouse::TOGGLESWITCH_UP) {
-                output = processB(processA(input));
-            } else if (routing_sw == Hothouse::TOGGLESWITCH_MIDDLE) {
-                output = (processA(input) + processB(input) / 2.0F);
-            } else if (routing_sw == Hothouse::TOGGLESWITCH_DOWN) {
-                output = processA(processB(input));
-            } else {
-                output = input;
-            }
         }
+
+        // if (bypassA && bypassB) {
+        //     output = input;
+        // } else if (bypassA) {
+        //     output = processB(input);
+        // } else if (bypassB) {
+        //     output = processA(input);
+        // } else if (!bypassA && !bypassB) {
+
+        //     if (routing_sw == Hothouse::TOGGLESWITCH_UP) {
+        //         output = processB(processA(input));
+        //     } else if (routing_sw == Hothouse::TOGGLESWITCH_MIDDLE) {
+        //         output = (processA(input) + processB(input) / 2.0F);
+        //     } else if (routing_sw == Hothouse::TOGGLESWITCH_DOWN) {
+        //         output = processA(processB(input));
+        //     } else {
+        //         output = input;
+        //     }
+        // }
 
         out[0][i] = out[1][i] = blocker.Process(output);
     }

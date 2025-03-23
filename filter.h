@@ -27,9 +27,23 @@
 #include "daisysp.h"
 #include <cmath>
 
+namespace jkoDSP {
+
 using daisysp::OnePole;
 
 /*
+This file includes a set of audio filters
+- Low Pass
+- Low Shelf
+- Peak
+- Notch
+- High Shelf
+- High Pass
+- All Pass
+
+For each of the filter types, multiple algorithms may be provided.
+This implementation provides a standard interface for each type
+of filter hiding details of each algorithm.
 
 */
 
@@ -37,17 +51,17 @@ const int ft_undefined = 0;
 
 class Filter {
 public:
-    // enum filterType : integer { ft_undefined };
     virtual void Init(float sampleRate, int ftype) = 0;
-    virtual void reset() = 0;
     virtual float render(float in) = 0;
     virtual void setFreq(float freq) = 0;
     virtual void updateCoefficients() = 0;
 
 protected:
-    float sampleRate = 48000.f;
+    virtual void reset() = 0;
+
+    float sampleRate = 0.f; // undefined
     int ftype = ft_undefined;
-    float freq;
+    float freq = 0.f; // undefined
 };
 
 class LowPass : Filter {
@@ -57,295 +71,123 @@ public:
         ft_daisy_biquad = 3,
         ft_daisy_svf = 4 };
 
-    void Init(float sampleRate, int ftype) override
-    {
-        this->sampleRate = sampleRate;
+    void Init(float sampleRate, int ftype) override;
+    float render(float in) override;
+    void setFreq(float freq) override;
+    void updateCoefficients() override;
 
-        if (ftype < ft_cytomic_svf || ftype > ft_daisy_svf)
-            ftype = ft_undefined;
-
-        this->ftype = ftype;
-
-        switch (ftype) {
-        case ft_daisy_onepole:
-            onepole.Init();
-            onepole.SetFilterMode(OnePole::FILTER_MODE_LOW_PASS);
-            /* code */
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    void reset()
-    {
-        switch (ftype) {
-        case ft_cytomic_svf:
-            /* code */
-            break;
-
-        case ft_daisy_onepole:
-            /* code */
-            break;
-
-        case ft_daisy_biquad:
-            /* code */
-            break;
-
-        case ft_daisy_svf:
-            /* code */
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    float render(float in)
-    {
-        switch (ftype) {
-        case ft_cytomic_svf:
-            return in;
-            break;
-
-        case ft_daisy_onepole:
-            return in;
-            break;
-
-        case ft_daisy_biquad:
-            return in;
-            break;
-
-        case ft_daisy_svf:
-            return in;
-            break;
-
-        default:
-            return in;
-            break;
-        }
-
-        return in;
-    }
-
-    void setFreq(float freq)
-    {
-        this->freq = freq;
-        updateCoefficients();
-    }
-
-    void updateCoefficients()
-    {
-
-        switch (ftype) {
-        case ft_cytomic_svf:
-            /* code */
-            break;
-
-        case ft_daisy_onepole:
-            /* code */
-            break;
-
-        case ft_daisy_biquad:
-            /* code */
-            break;
-
-        case ft_daisy_svf:
-            /* code */
-            break;
-
-        default:
-            break;
-        }
-    }
+protected:
+    void reset() override;
 
 private:
     jkoDSP::Biquad biquad;
     OnePole onepole;
 };
 
-// Provides a set of audio filters
-class xLowpass : Filter {
-public:
-    enum filterType {
-        ft_cytomic_svf,
-        ft_onepole_lowpass1, // daisy onepole
-        ft_onepole_highpass1, // daisy onepole
-        ft_lowshelf1, // daisy biquad
-        ft_lowshelf2, // daisy svf
-        ft_lowpass1, // daisy biquad
-        ft_lowpass2, // daisy svf
-        ft_highpass1, // daisy biquad
-        ft_highpass2,
-        ft_peak1, // daisy biquad
-        ft_notch1, // daisy biquad
-        ft_bandpass1, // daisy biquad
-        ft_allpass
-    };
+void LowPass::Init(float sampleRate, int ftype)
+{
+    this->sampleRate = sampleRate;
 
-    // sample_rate - samples per second
-    // filter_type - enum
-    void Init(float sampleRate, filterType filter_type)
-    {
-        fs = sampleRate;
-        fType = filter_type;
-        fc = 8000.f;
-        Q = 2.f;
-        gain = 1.f;
-        resonance = 0.5f;
-        bandwidth = 400.f;
+    if (ftype < ft_cytomic_svf || ftype > ft_daisy_svf)
+        ftype = ft_undefined;
 
-        reset();
-        updateCoefficients();
+    this->ftype = ftype;
+
+    switch (ftype) {
+    case ft_daisy_onepole:
+        onepole.Init();
+        onepole.SetFilterMode(OnePole::FILTER_MODE_LOW_PASS);
+        /* code */
+        break;
+
+    default:
+        break;
+    }
+}
+
+float LowPass::render(float in)
+{
+    switch (ftype) {
+    case ft_cytomic_svf:
+        return in;
+        break;
+
+    case ft_daisy_onepole:
+        return in;
+        break;
+
+    case ft_daisy_biquad:
+        return in;
+        break;
+
+    case ft_daisy_svf:
+        return in;
+        break;
+
+    default:
+        return in;
+        break;
     }
 
-    // sets the internal state variables to known values
-    void reset()
-    {
-        state1 = 0.f;
-        state2 = 0.f;
+    return in;
+}
 
-        g = 0.f;
-        k = 0.f;
+void LowPass::setFreq(float freq)
+{
+    this->freq = freq;
+    updateCoefficients();
+}
 
-        a0 = a1 = a2 = a3 = 0.f;
-        b0 = b1 = b2 = b3 = 0.f;
+void LowPass::updateCoefficients()
+{
+
+    switch (ftype) {
+    case ft_cytomic_svf:
+        /* code */
+        break;
+
+    case ft_daisy_onepole:
+        /* code */
+        break;
+
+    case ft_daisy_biquad:
+        /* code */
+        break;
+
+    case ft_daisy_svf:
+        /* code */
+        break;
+
+    default:
+        break;
     }
+}
 
-    // in is the next sample to process, returns a filtered sample
-    float render(float in)
-    {
-        float out = in;
+void LowPass::reset()
+{
+    switch (ftype) {
+    case ft_cytomic_svf:
+        /* code */
+        break;
 
-        return out;
+    case ft_daisy_onepole:
+        /* code */
+        break;
+
+    case ft_daisy_biquad:
+        /* code */
+        break;
+
+    case ft_daisy_svf:
+        /* code */
+        break;
+
+    default:
+        break;
     }
+}
 
-    // Filter cutoff in hz
-    void setCutoff(float cutoff)
-    {
-        fc = daisysp::fclamp(cutoff, 10.f, 20000.f);
-        ;
-        updateCoefficients();
-    }
-
-    // Calculate the filter coefficients
-    void updateCoefficients()
-    {
-        switch (fType) {
-        case ft_allpass:
-            /* code */
-            break;
-
-        case ft_bandpass1:
-            /* code */
-            break;
-
-        case ft_cytomic_svf:
-            /* code */
-            break;
-
-        case ft_highpass1:
-            /* code */
-            break;
-
-        case ft_highpass2:
-            /* code */
-            break;
-
-        case ft_lowpass1:
-            /* code */
-            break;
-
-        case ft_lowpass2:
-            /* code */
-            break;
-
-        case ft_peak1:
-            /* code */
-            break;
-
-        case ft_lowshelf1:
-            /* code */
-            break;
-
-        case ft_lowshelf2:
-            /* code */
-            break;
-
-        case ft_onepole_highpass1:
-            /* code */
-            break;
-
-        case ft_onepole_lowpass1:
-            /* code */
-            break;
-
-        default:
-            break;
-        }
-    }
-
-    void setQ(float Q)
-    {
-        this->Q = daisysp::fclamp(Q, 0.707f, 20.f);
-    }
-
-    void setGain(float gain)
-    {
-        this->gain = gain;
-    }
-
-    void setResonance(float resonance)
-    {
-        this->resonance = resonance;
-    }
-
-    void setBandwidth(float bandwidth)
-    {
-        this->bandwidth = bandwidth;
-    }
-
-    float getQ()
-    {
-        return Q;
-    }
-
-    float getGain()
-    {
-        return gain;
-    }
-
-    float getResonance()
-    {
-        return resonance;
-    }
-
-    // Filter cutoff in hz
-    float getCutoff()
-    {
-        return fc;
-    }
-
-private:
-    float fs;
-
-    filterType fType;
-
-    float fc;
-    float Q;
-    float gain;
-    float resonance;
-    float bandwidth;
-
-    float state1;
-    float state2;
-
-    float a0, a1, a2, a3;
-    float b0, b1, b2, b3;
-
-    float g, k;
-};
+// Below this point should be removed after reimplementing
 
 // Resonant low-pass filter based on Cytomic SVF.
 class Cytomic_SVF {
@@ -456,11 +298,11 @@ private:
     int order = 2;
 };
 
-
 class LowShelf2 {
 
 public:
-    void init(float sample_rate) {
+    void init(float sample_rate)
+    {
         sampleRate = sample_rate;
         z1 = 0.f;
         z2 = 0.f;
@@ -487,16 +329,18 @@ public:
         float r2K = root2 * K;
 
         if (G > 0.f) {
-            b0 = (1.f + r2sqrV0K + V0K2)  / (1 + r2K + 2);
-            b1 = (2.f * (V0K2 - 1.f))  / (1 + r2K + 2);
-            b2 = (1.f - r2sqrV0K + V0K2)  / (1 + r2K + 2);
-            a1 = (2.f * (K2 - 1.f))  / (1 + r2K + 2);;
-            a2 = (1.f - r2K + K2) / (1 + r2K + 2);;
+            b0 = (1.f + r2sqrV0K + V0K2) / (1 + r2K + 2);
+            b1 = (2.f * (V0K2 - 1.f)) / (1 + r2K + 2);
+            b2 = (1.f - r2sqrV0K + V0K2) / (1 + r2K + 2);
+            a1 = (2.f * (K2 - 1.f)) / (1 + r2K + 2);
+            ;
+            a2 = (1.f - r2K + K2) / (1 + r2K + 2);
+            ;
         } else {
-            b0 = (1.f + r2K + K2)  / (1 + r2sqrV0K + V0K2);
-            b1 = (2.f * (K2 - 1.f))  / (1 + r2sqrV0K + V0K2);
-            b2 = (1.f - r2K + K2)  / (1 + r2sqrV0K + V0K2);
-            a1 = (2.f * (V0K2 - 1.f))  / (1 + r2sqrV0K + V0K2);
+            b0 = (1.f + r2K + K2) / (1 + r2sqrV0K + V0K2);
+            b1 = (2.f * (K2 - 1.f)) / (1 + r2sqrV0K + V0K2);
+            b2 = (1.f - r2K + K2) / (1 + r2sqrV0K + V0K2);
+            a1 = (2.f * (V0K2 - 1.f)) / (1 + r2sqrV0K + V0K2);
             a2 = (1.f - r2sqrV0K + V0K2) / (1 + r2sqrV0K + V0K2);
         }
 
@@ -504,12 +348,13 @@ public:
     }
 
     // Apply the low shelf filter to a single sample
-    float applyLowShelfFilter(float in) {
-            float out = in * a0 + z1;
-            z1 = in * a1 + z2 - b1 * out;
-            z2 = in * a2 - b2 * out;
-            return out;
-        }
+    float applyLowShelfFilter(float in)
+    {
+        float out = in * a0 + z1;
+        z1 = in * a1 + z2 - b1 * out;
+        z2 = in * a2 - b2 * out;
+        return out;
+    }
 
 private:
     float a0, a1, a2;
@@ -520,103 +365,4 @@ private:
     float sampleRate;
 };
 
-
-
-
-/*
-
-function [b, a]  = shelving(G, fc, fs, Q, type)
-
-%
-% Derive coefficients for a shelving filter with a given amplitude and
-% cutoff frequency.  All coefficients are calculated as described in 
-% Zolzer's DAFX book (p. 50 -55).  
-%
-% Usage:     [B,A] = shelving(G, Fc, Fs, Q, type);
-%
-%            G is the logrithmic gain (in dB)
-%            FC is the center frequency
-%            Fs is the sampling rate
-%            Q adjusts the slope be replacing the sqrt(2) term
-%            type is a character string defining filter type
-%                 Choices are: 'Base_Shelf' or 'Treble_Shelf'
-%
-% Author:    sparafucile17 08/22/05
-%
-
-%Error Check
-if((strcmp(type,'Base_Shelf') ~= 1) && (strcmp(type,'Treble_Shelf') ~= 1))
-    error(['Unsupported Filter Type: ' type]);
-end
-
-K = tan((pi * fc)/fs);
-V0 = 10^(G/20);
-root2 = 1/Q; %sqrt(2)
-
-%Invert gain if a cut
-if(V0 < 1)
-    V0 = 1/V0;
-end
-
-%%%%%%%%%%%%%%%%%%%%
-%    BASE BOOST
-%%%%%%%%%%%%%%%%%%%%
-if(( G > 0 ) & (strcmp(type,'Base_Shelf')))
-   
-    b0 = (1 + sqrt(V0)*root2*K + V0*K^2) / (1 + root2*K + K^2);
-    b1 =             (2 * (V0*K^2 - 1) ) / (1 + root2*K + K^2);
-    b2 = (1 - sqrt(V0)*root2*K + V0*K^2) / (1 + root2*K + K^2);
-    a1 =                (2 * (K^2 - 1) ) / (1 + root2*K + K^2);
-    a2 =             (1 - root2*K + K^2) / (1 + root2*K + K^2);
-
-%%%%%%%%%%%%%%%%%%%%
-%    BASE CUT
-%%%%%%%%%%%%%%%%%%%%
-elseif (( G < 0 ) & (strcmp(type,'Base_Shelf')))
-    
-    b0 =             (1 + root2*K + K^2) / (1 + root2*sqrt(V0)*K + V0*K^2);
-    b1 =                (2 * (K^2 - 1) ) / (1 + root2*sqrt(V0)*K + V0*K^2);
-    b2 =             (1 - root2*K + K^2) / (1 + root2*sqrt(V0)*K + V0*K^2);
-    a1 =             (2 * (V0*K^2 - 1) ) / (1 + root2*sqrt(V0)*K + V0*K^2);
-    a2 = (1 - root2*sqrt(V0)*K + V0*K^2) / (1 + root2*sqrt(V0)*K + V0*K^2);
-
-%%%%%%%%%%%%%%%%%%%%
-%   TREBLE BOOST
-%%%%%%%%%%%%%%%%%%%%
-elseif (( G > 0 ) & (strcmp(type,'Treble_Shelf')))
-
-    b0 = (V0 + root2*sqrt(V0)*K + K^2) / (1 + root2*K + K^2);
-    b1 =             (2 * (K^2 - V0) ) / (1 + root2*K + K^2);
-    b2 = (V0 - root2*sqrt(V0)*K + K^2) / (1 + root2*K + K^2);
-    a1 =              (2 * (K^2 - 1) ) / (1 + root2*K + K^2);
-    a2 =           (1 - root2*K + K^2) / (1 + root2*K + K^2);
-
-%%%%%%%%%%%%%%%%%%%%
-%   TREBLE CUT
-%%%%%%%%%%%%%%%%%%%%
-
-elseif (( G < 0 ) & (strcmp(type,'Treble_Shelf')))
-
-    b0 =               (1 + root2*K + K^2) / (V0 + root2*sqrt(V0)*K + K^2);
-    b1 =                  (2 * (K^2 - 1) ) / (V0 + root2*sqrt(V0)*K + K^2);
-    b2 =               (1 - root2*K + K^2) / (V0 + root2*sqrt(V0)*K + K^2);
-    a1 =             (2 * ((K^2)/V0 - 1) ) / (1 + root2/sqrt(V0)*K + (K^2)/V0);
-    a2 = (1 - root2/sqrt(V0)*K + (K^2)/V0) / (1 + root2/sqrt(V0)*K + (K^2)/V0);
-
-%%%%%%%%%%%%%%%%%%%%
-%   All-Pass
-%%%%%%%%%%%%%%%%%%%%
-else
-    b0 = V0;
-    b1 = 0;
-    b2 = 0;
-    a1 = 0;
-    a2 = 0;
-end
-
-%return values
-a = [  1, a1, a2];
-b = [ b0, b1, b2];
-
-
-*/
+}

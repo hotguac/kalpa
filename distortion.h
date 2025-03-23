@@ -34,7 +34,7 @@ public:
     const float ls_pre_gain = -6.0f;
 
     const float ls_post_hz = ls_pre_hz;
-    const float ls_post_gain = ls_pre_gain * -0.8f;
+    const float ls_post_gain = ls_pre_gain * -0.9f;
 
     const float lp_post_hz = 8000.0f;
 
@@ -77,40 +77,48 @@ public:
         lp_tone.setFc(lp_pre_hz / samplerate);
         lp_tone.setQ(0.707f);
 
-        lp_test.Init(samplerate, LowPass::ft_daisy_onepole);
+        // lp_test.Init(samplerate, LowPass::ft_daisy_onepole);
     }
 
     float softClip(float in, float drive, float tone, float volume, float emphasis, float bandwidth, float amount)
     {
-        float out;
+        float out = in;
 
-        // Bump up the signal level to drive more clipping
-        out = in;
-
-        // Pre-clipping EQ
+        // Pre-clip EQ
         out = lp_pre.process(out);
         out = hp_pre.process(out);
 
-        ls_pre.setFc(fmap(emphasis, 80.f, 800.f, Mapping::LOG) / sample_rate);
-        ls_pre.setPeakGain(fmap(amount, -16.f, -6.f, Mapping::LOG));
-        out = ls_pre.process(out);
+        ls_pre.setFc(fmap(emphasis, 40.f, 200.f, Mapping::LOG) / sample_rate);
+        ls_pre.setPeakGain(fmap(amount, -16.f, -12.f, Mapping::LOG));
+        // out = ls_pre.process(out);
+
+        // add drive to increase distortion
+        // add offset to increase assymetry
+        const float offset = 0.1f;
+        out = out * (6.f + drive * 200.f) + offset;
 
         // Our clipping function
-        out = tanh(out * (2.f + drive * 36.f));
+        if (out > 0.f) {
+            // out = daisysp::SoftClip(out);
+            out = tanh(out);
+        } else {
+            // out = daisysp::soft_saturate(out, 0.25f + bandwidth);
+            out = tanh(out * 1.2f);
+        }
 
         // Post clip EQ
         ls_post.setFc(ls_pre.getFc());
-        ls_post.setPeakGain(ls_pre.getGain() * -0.6f);
+        ls_post.setPeakGain(ls_pre.getGain() * -0.8f);
 
-        out = ls_post.process(out);
-        out = pk_post.process(out);
-        
+        // out = ls_post.process(out);
+        // out = pk_post.process(out);
+
         // User tone control
         lp_tone.setFc(get_freq(tone) / sample_rate);
         out = lp_tone.process(out);
 
         // Adjust output gain
-        float gain = volume / (2.f + drive * 4.f);
+        float gain = volume / (2.f + drive * 8.f);
 
         return (out * gain);
     }
@@ -120,7 +128,7 @@ private:
 
     float get_freq(float tone)
     {
-        return fmap(tone, 1200, 8000, Mapping::LOG);
+        return fmap(tone, 1800, 5000, Mapping::LOG);
     }
 
     float get_q(float tone)
@@ -138,5 +146,5 @@ private:
 
     jkoDSP::Biquad lp_tone;
 
-    LowPass lp_test;
+    // LowPass lp_test;
 };
