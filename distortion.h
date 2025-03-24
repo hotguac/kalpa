@@ -25,10 +25,20 @@ using daisysp::fmap;
 using daisysp::Mapping;
 using daisysp::Svf;
 
+static inline float fast_tanh(float x)
+{
+    if (x > 3.0f)
+        return 1.0f;
+    if (x < -3.0f)
+        return -1.0f;
+    float x2 = x * x;
+    return x * (27.0f + x2) / (27.0f + 9.0f * x2);
+}
+
 class Distortion {
 public:
-    const float lp_pre_hz = 6000.0f;
-    const float hp_pre_hz = 80.0f;
+    const float lp_pre_hz = 4800.0f;
+    const float hp_pre_hz = 60.0f;
 
     const float ls_pre_hz = 300.0f;
     const float ls_pre_gain = -6.0f;
@@ -54,33 +64,12 @@ public:
         hp_pre.setFc(hp_pre_hz / samplerate);
         hp_pre.setQ(0.707f);
 
-        ls_pre.setType(jkoDSP::bq_type_lowshelf);
-        ls_pre.setFc(ls_pre_hz / samplerate);
-        ls_pre.setQ(0.707f);
-        ls_pre.setPeakGain(ls_pre_gain);
-
-        lp_post.setType(jkoDSP::bq_type_lowpass);
-        lp_post.setFc(lp_post_hz / samplerate);
-        lp_post.setQ(0.707f);
-
-        ls_post.setType(jkoDSP::bq_type_lowshelf);
-        ls_post.setFc(ls_post_hz / samplerate);
-        ls_post.setQ(0.707f);
-        ls_post.setPeakGain(ls_post_gain);
-
-        pk_post.setType(jkoDSP::bq_type_peak);
-        pk_post.setFc(pk_post_hz / samplerate);
-        pk_post.setQ(pk_post_q);
-        pk_post.setPeakGain(pk_post_gain);
-
         lp_tone.setType(jkoDSP::bq_type_lowpass);
         lp_tone.setFc(lp_pre_hz / samplerate);
         lp_tone.setQ(0.707f);
-
-        // lp_test.Init(samplerate, LowPass::ft_daisy_onepole);
     }
 
-    float softClip(float in, float drive, float tone, float volume, float emphasis, float bandwidth, float amount)
+    float softClip(float in, float drive, float tone, float volume)
     {
         float out = in;
 
@@ -88,37 +77,24 @@ public:
         out = lp_pre.process(out);
         out = hp_pre.process(out);
 
-        ls_pre.setFc(fmap(emphasis, 40.f, 200.f, Mapping::LOG) / sample_rate);
-        ls_pre.setPeakGain(fmap(amount, -16.f, -12.f, Mapping::LOG));
-        // out = ls_pre.process(out);
-
         // add drive to increase distortion
         // add offset to increase assymetry
-        const float offset = 0.1f;
+        const float offset = 0.2f;
         out = out * (6.f + drive * 200.f) + offset;
 
         // Our clipping function
         if (out > 0.f) {
-            // out = daisysp::SoftClip(out);
-            out = tanh(out);
+            out = fast_tanh(out);
         } else {
-            // out = daisysp::soft_saturate(out, 0.25f + bandwidth);
-            out = tanh(out * 1.2f);
+            out = fast_tanh(out * 1.2f);
         }
-
-        // Post clip EQ
-        ls_post.setFc(ls_pre.getFc());
-        ls_post.setPeakGain(ls_pre.getGain() * -0.8f);
-
-        // out = ls_post.process(out);
-        // out = pk_post.process(out);
 
         // User tone control
         lp_tone.setFc(get_freq(tone) / sample_rate);
         out = lp_tone.process(out);
 
         // Adjust output gain
-        float gain = volume / (2.f + drive * 8.f);
+        float gain = volume / (4.f + drive * 12.f);
 
         return (out * gain);
     }
@@ -128,7 +104,7 @@ private:
 
     float get_freq(float tone)
     {
-        return fmap(tone, 1800, 5000, Mapping::LOG);
+        return fmap(tone, 1800, 6000, Mapping::LOG);
     }
 
     float get_q(float tone)
@@ -138,13 +114,6 @@ private:
 
     jkoDSP::Biquad lp_pre;
     jkoDSP::Biquad hp_pre;
-    jkoDSP::Biquad ls_pre;
-
-    jkoDSP::Biquad lp_post;
-    jkoDSP::Biquad ls_post;
-    jkoDSP::Biquad pk_post;
 
     jkoDSP::Biquad lp_tone;
-
-    // LowPass lp_test;
 };

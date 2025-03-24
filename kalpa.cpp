@@ -48,7 +48,11 @@ float volumeB;
 
 float denormal_guard = 10e-15f;
 
-Hothouse::ToggleswitchPosition sw1;
+float samplerate;
+float coeff = 0.01f;
+float smooth_drive = 0.f;
+float smooth_tone = 0.f;
+float smooth_volume = 0.f;
 
 DcBlock blocker;
 
@@ -60,50 +64,12 @@ float processA(float in)
         return in;
     }
 
-    out = distA.softClip(in, driveA, toneA, volumeA, driveB, toneB, volumeB);
+    float coeff = 1.f / (0.01f * samplerate);
+    daisysp::fonepole(smooth_drive, driveA, coeff);
+    daisysp::fonepole(smooth_tone, toneA, coeff);
+    daisysp::fonepole(smooth_volume, volumeA, coeff);
 
-    // sw1 = hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_1);
-
-    // switch (hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_1)) {
-    // case Hothouse::TOGGLESWITCH_UP: {
-    //     out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB, volumeB);
-    //     break;
-    // }
-    // case Hothouse::TOGGLESWITCH_MIDDLE: {
-    //     out = distA.softClip(in, driveA, toneA, volumeA, driveB, toneB, volumeB);
-    //     break;
-    // }
-    // default: {
-    //     out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB, volumeB);
-    //     break;
-    // }
-    // }
-
-    return out;
-}
-
-float processB(float in)
-{
-    float out = 0.0f;
-
-    if (bypassB) {
-        return in;
-    }
-
-    switch (hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_3)) {
-    case Hothouse::TOGGLESWITCH_UP: {
-        out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB, volumeB);
-        break;
-    }
-    case Hothouse::TOGGLESWITCH_MIDDLE: {
-        out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB, volumeB);
-        break;
-    }
-    default: {
-        out = distB.softClip(in, driveB, toneB, volumeB, driveB, toneB, volumeB);
-        break;
-    }
-    }
+    out = distA.softClip(in, smooth_drive, smooth_tone, smooth_volume);
 
     return out;
 }
@@ -121,8 +87,6 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out,
     // Toggle LEDs based on footswitches
     led1_on ^= hw.switches[Hothouse::FOOTSWITCH_1].RisingEdge();
     led2_on ^= hw.switches[Hothouse::FOOTSWITCH_2].RisingEdge();
-
-    Hothouse::ToggleswitchPosition routing_sw = hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_2);
 
     driveA = hw.GetKnobValue(Hothouse::KNOB_1);
     toneA = hw.GetKnobValue(Hothouse::KNOB_2);
@@ -144,25 +108,6 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out,
             output = processA(input);
         }
 
-        // if (bypassA && bypassB) {
-        //     output = input;
-        // } else if (bypassA) {
-        //     output = processB(input);
-        // } else if (bypassB) {
-        //     output = processA(input);
-        // } else if (!bypassA && !bypassB) {
-
-        //     if (routing_sw == Hothouse::TOGGLESWITCH_UP) {
-        //         output = processB(processA(input));
-        //     } else if (routing_sw == Hothouse::TOGGLESWITCH_MIDDLE) {
-        //         output = (processA(input) + processB(input) / 2.0F);
-        //     } else if (routing_sw == Hothouse::TOGGLESWITCH_DOWN) {
-        //         output = processA(processB(input));
-        //     } else {
-        //         output = input;
-        //     }
-        // }
-
         out[0][i] = out[1][i] = blocker.Process(output);
     }
 }
@@ -173,7 +118,7 @@ int main()
     hw.SetAudioBlockSize(48); // Number of samples handled per callback
     hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_48KHZ);
 
-    float samplerate = hw.AudioSampleRate();
+    samplerate = hw.AudioSampleRate();
 
     distA.init(samplerate);
     distB.init(samplerate);
