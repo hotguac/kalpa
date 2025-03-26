@@ -19,7 +19,6 @@
 
 #include "Biquad.h"
 #include "daisysp.h"
-#include "filter.h"
 
 using daisysp::fmap;
 using daisysp::Mapping;
@@ -37,7 +36,7 @@ static inline float fast_tanh(float x)
 
 class Distortion {
 public:
-    const float lp_pre_hz = 4800.0f;
+    const float lp_pre_hz = 2400.0f;
     const float hp_pre_hz = 60.0f;
 
     const float ls_pre_hz = 300.0f;
@@ -48,25 +47,29 @@ public:
 
     const float lp_post_hz = 8000.0f;
 
-    const float pk_post_hz = 400.f;
-    const float pk_post_q = 2.f;
-    const float pk_post_gain = 3.f;
+    //    const float pk_post_hz = 400.f;
+    //    const float pk_post_q = 2.f;
+    //    const float pk_post_gain = 3.f;
 
     void init(float samplerate)
     {
-        sample_rate = samplerate;
+        sample_rate = samplerate * 2.f;
 
         lp_pre.setType(jkoDSP::bq_type_lowpass);
-        lp_pre.setFc(lp_pre_hz / samplerate);
+        lp_pre.setFc(lp_pre_hz / sample_rate);
         lp_pre.setQ(0.707f);
 
         hp_pre.setType(jkoDSP::bq_type_highpass);
-        hp_pre.setFc(hp_pre_hz / samplerate);
+        hp_pre.setFc(hp_pre_hz / sample_rate);
         hp_pre.setQ(0.707f);
 
         lp_tone.setType(jkoDSP::bq_type_lowpass);
-        lp_tone.setFc(lp_pre_hz / samplerate);
+        lp_tone.setFc(lp_pre_hz / sample_rate);
         lp_tone.setQ(0.707f);
+
+        lp_anti.setType(jkoDSP::bq_type_lowpass);
+        lp_anti.setFc(6000.f / sample_rate);
+        lp_anti.setQ(0.707f);
     }
 
     float softClip(float in, float drive, float tone, float volume)
@@ -79,22 +82,25 @@ public:
 
         // add drive to increase distortion
         // add offset to increase assymetry
-        const float offset = 0.2f;
-        out = out * (6.f + drive * 200.f) + offset;
+        const float offset = -0.1f;
+        float preGain = fmap(drive, 4.f, 100.f, Mapping::EXP);
+
+        out = out * preGain + offset;
 
         // Our clipping function
-        if (out > 0.f) {
-            out = fast_tanh(out);
-        } else {
-            out = fast_tanh(out * 1.2f);
-        }
+        out = fast_tanh(out);
+        // float xdrive = 2.8; -- good range 2 to 3 ish
+        // out = fast_tanh(out * xdrive) / fast_tanh(xdrive);
+
+        // Anti-aliasing filter
+        out = lp_anti.process(out);
 
         // User tone control
         lp_tone.setFc(get_freq(tone) / sample_rate);
         out = lp_tone.process(out);
 
         // Adjust output gain
-        float gain = volume / (4.f + drive * 12.f);
+        float gain = volume / (3.f + drive * 10.f);
 
         return (out * gain);
     }
@@ -116,4 +122,5 @@ private:
     jkoDSP::Biquad hp_pre;
 
     jkoDSP::Biquad lp_tone;
+    jkoDSP::Biquad lp_anti;
 };

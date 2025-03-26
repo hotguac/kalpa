@@ -34,22 +34,17 @@ Led led_1, led_2;
 bool led1_on = false, led2_on = false;
 bool bypassA = true, bypassB = true;
 
-Distortion distA, distB;
+Distortion distA;
 
-float current_sample = 0.0f;
+float current_sample = 0.f;
 
-float driveA;
-float toneA;
-float volumeA;
-
-float driveB;
-float toneB;
-float volumeB;
-
-float denormal_guard = 10e-15f;
+float driveA = 0.f;
+float toneA = 0.f;
+float volumeA = 0.f;
 
 float samplerate;
-float coeff = 0.01f;
+float coeff = 0.002f;
+
 float smooth_drive = 0.f;
 float smooth_tone = 0.f;
 float smooth_volume = 0.f;
@@ -64,7 +59,7 @@ float processA(float in)
         return in;
     }
 
-    float coeff = 1.f / (0.01f * samplerate);
+    float coeff = 1.f / (0.01f * samplerate); // 10ms ramp to target setting
     daisysp::fonepole(smooth_drive, driveA, coeff);
     daisysp::fonepole(smooth_tone, toneA, coeff);
     daisysp::fonepole(smooth_volume, volumeA, coeff);
@@ -77,8 +72,6 @@ float processA(float in)
 void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out,
     size_t size)
 {
-    denormal_guard = -denormal_guard;
-
     hw.ProcessAllControls();
 
     bypassA ^= hw.switches[Hothouse::FOOTSWITCH_1].RisingEdge();
@@ -92,36 +85,35 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out,
     toneA = hw.GetKnobValue(Hothouse::KNOB_2);
     volumeA = hw.GetKnobValue(Hothouse::KNOB_3);
 
-    driveB = hw.GetKnobValue(Hothouse::KNOB_4);
-    toneB = hw.GetKnobValue(Hothouse::KNOB_5);
-    volumeB = hw.GetKnobValue(Hothouse::KNOB_6);
-
     float output = 0.0f;
     float input = 0.0f;
 
     for (size_t i = 0; i < size; ++i) {
-        input = in[0][i] + denormal_guard;
+        input = in[0][i]; // + denormal_guard;
 
         if (bypassA) {
             output = input;
         } else {
+            processA(0.f); // upsample 2x
             output = processA(input);
         }
 
-        out[0][i] = out[1][i] = blocker.Process(output);
+        output = blocker.Process(output);
+        out[0][i] = out[1][i] = DSY_CLAMP(output, -0.90f, 0.92f);
     }
 }
 
 int main()
 {
     hw.Init();
-    hw.SetAudioBlockSize(48); // Number of samples handled per callback
-    hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_48KHZ);
+    hw.SetAudioBlockSize(96); // Number of samples handled per callback
+    hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_96KHZ);
+
+    // DaisySeed::StartLog();
 
     samplerate = hw.AudioSampleRate();
 
     distA.init(samplerate);
-    distB.init(samplerate);
     blocker.Init(samplerate);
 
     led_1.Init(hw.seed.GetPin(Hothouse::LED_1), false);
@@ -130,8 +122,12 @@ int main()
     hw.StartAdc();
     hw.StartAudio(AudioCallback);
 
+    // DaisySeed::PrintLine("starting");
+
     while (true) {
         hw.DelayMs(10);
+
+        // DaisySeed::PrintLine("looping");
 
         // Toggle effect bypass LED when footswitch is pressed
         // Toggle LEDs
