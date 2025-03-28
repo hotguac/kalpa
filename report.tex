@@ -1,0 +1,68 @@
+%% use pdflatex report.tex 
+%% to generate report.pdf
+\documentclass[landscape,twoside]{article}
+
+\usepackage[paperheight=8.5in, paperwidth=11in,% Set the height and width of the paper
+ includehead,
+ voffset=-44pt,
+ hoffset=-44pt,
+ nomarginpar,% We don't want any margin paragraphs
+ textwidth=690pt,% Set \textwidth to 10cm
+ textheight=512pt,
+ %% headheight=12.0pt% Set \headheight to 10mm
+ ]{geometry}
+
+\usepackage{lastpage}
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\setlength{\headheight}{12pt}
+%% Define your header here. 
+%% See http://texblog.org/2007/11/07/headerfooter-in-latex-with-fancyhdr/
+
+%... then configure it.
+\fancyhead{} % clear all header fields
+\fancyhead[RE,RO]{\thepage\ of \pageref{LastPage}}
+\fancyfoot{} % clear all footer fields
+
+%% Set the colors (greyscale) that we'll use
+\usepackage[usenames,dvipsnames]{color}  %% Allow color names
+
+\definecolor{myComment}{RGB}{40,40,40}
+\definecolor{myKeyword}{RGB}{0,0,0}
+\definecolor{myIdentifier}{RGB}{0,0,0}
+
+\setlength{\topmargin}{2.0pt}
+\setlength{\footskip}{4.0pt}
+\setlength{\oddsidemargin}{20pt}
+\evensidemargin=20pt
+
+%% The listings package will format your source code
+\usepackage{listings}
+\lstdefinestyle{customasm}{
+  aboveskip=0.1in,
+  columns=flexible,
+  tabsize=4,
+  language=C++,
+  breaklines=true, %% Wrap long lines
+  basicstyle=\fontfamily{cmss}\fontseries{m}\normalsize,
+  commentstyle=\itshape\color{myComment}\small,
+  stringstyle=\color{Black},
+  keywordstyle=\fontseries{bx}\color{myKeyword}\small,
+  identifierstyle=\mdseries\color{myIdentifier},
+  showstringspaces=false,
+  inputpath=./
+}        
+
+
+\begin{document}
+\fancyhead[CE,CO]{\textbf{Biquad.h}}
+\lstinputlisting[style=customasm]{Biquad.h}
+\newpage
+\fancyhead[CE,CO]{\textbf{kalpa.cpp}}
+\lstinputlisting[style=customasm]{kalpa.cpp}
+\newpage
+\fancyhead[CE,CO]{\textbf{distortion.h}}
+\lstinputlisting[style=customasm]{distortion.h}
+
+\end{document}

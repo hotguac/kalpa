@@ -94,7 +94,6 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out,
         if (bypassA) {
             output = input;
         } else {
-            processA(0.f); // upsample 2x
             output = processA(input);
         }
 

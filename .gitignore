@@ -2,3 +2,6 @@ ADC17FiftyShadesDistortion/*
 build/*
 .vscode/*
 
+report.aux
+report.log
+report.pdf

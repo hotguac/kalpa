@@ -36,8 +36,31 @@ static inline float fast_tanh(float x)
 
 class Distortion {
 public:
-    const float lp_pre_hz = 2400.0f;
-    const float hp_pre_hz = 60.0f;
+    void init(float samplerate)
+    {
+        this->samplerate = samplerate * 2.f;
+
+        init_pre();
+        init_nolinear();
+        init_post();
+    }
+
+    float softClip(float in, float drive, float tone, float volume)
+    {
+        float out = in;
+
+        out = pre_process(out);
+        out = nonlinear_process(out, drive);
+        out = post_process(out, drive, tone, volume);
+
+        return out;
+    }
+
+private:
+    float samplerate;
+
+    const float lp_pre_hz = 3600.0f;
+    const float hp_pre_hz = 40.0f;
 
     const float ls_pre_hz = 300.0f;
     const float ls_pre_gain = -6.0f;
@@ -47,70 +70,93 @@ public:
 
     const float lp_post_hz = 8000.0f;
 
-    //    const float pk_post_hz = 400.f;
-    //    const float pk_post_q = 2.f;
-    //    const float pk_post_gain = 3.f;
-
-    void init(float samplerate)
+    void init_pre()
     {
-        sample_rate = samplerate * 2.f;
-
         lp_pre.setType(jkoDSP::bq_type_lowpass);
-        lp_pre.setFc(lp_pre_hz / sample_rate);
+        lp_pre.setFc(lp_pre_hz / samplerate);
         lp_pre.setQ(0.707f);
 
         hp_pre.setType(jkoDSP::bq_type_highpass);
-        hp_pre.setFc(hp_pre_hz / sample_rate);
+        hp_pre.setFc(hp_pre_hz / samplerate);
         hp_pre.setQ(0.707f);
-
-        lp_tone.setType(jkoDSP::bq_type_lowpass);
-        lp_tone.setFc(lp_pre_hz / sample_rate);
-        lp_tone.setQ(0.707f);
-
-        lp_anti.setType(jkoDSP::bq_type_lowpass);
-        lp_anti.setFc(6000.f / sample_rate);
-        lp_anti.setQ(0.707f);
     }
 
-    float softClip(float in, float drive, float tone, float volume)
+    void init_nolinear()
+    {
+        lp_anti_pre.setType(jkoDSP::bq_type_lowpass);
+        lp_anti_pre.setFc(6000.f / samplerate * 2.f);
+        lp_anti_pre.setQ(0.707f);
+
+        lp_anti_post.setType(jkoDSP::bq_type_lowpass);
+        lp_anti_post.setFc(6000.f / samplerate * 2.f);
+        lp_anti_post.setQ(0.707f);
+    }
+
+    void init_post()
+    {
+        lp_tone.setType(jkoDSP::bq_type_lowpass);
+        lp_tone.setFc(lp_pre_hz / samplerate);
+        lp_tone.setQ(0.707f);
+    }
+
+    // Pre-clip EQ
+    float pre_process(float in)
     {
         float out = in;
 
-        // Pre-clip EQ
         out = lp_pre.process(out);
         out = hp_pre.process(out);
+
+        return out;
+    }
+
+    float nonlinear_process(float in, float drive)
+    {
+        float out;
 
         // add drive to increase distortion
         // add offset to increase assymetry
         const float offset = -0.1f;
-        float preGain = fmap(drive, 4.f, 100.f, Mapping::EXP);
+        float preGain = fmap(drive, 4.f, 120.f, Mapping::EXP);
 
-        out = out * preGain + offset;
+        for (int i = 0; i < 2; ++i) {
+            if (i == 0) {
+                out = 0.f;
+            } else {
+                out = in * preGain + offset;
+            }
+            // Anti-aliasing filter
+            out = lp_anti_pre.process(out);
 
-        // Our clipping function
-        out = fast_tanh(out);
-        // float xdrive = 2.8; -- good range 2 to 3 ish
-        // out = fast_tanh(out * xdrive) / fast_tanh(xdrive);
+            // Our clipping function
+            out = fast_tanh(out);
+            // float xdrive = 2.8; -- good range 2 to 3 ish
+            // out = fast_tanh(out * xdrive) / fast_tanh(xdrive);
 
-        // Anti-aliasing filter
-        out = lp_anti.process(out);
+            // Anti-aliasing filter
+            out = lp_anti_post.process(out);
+        }
+
+        return out;
+    }
+
+    float post_process(float in, float drive, float tone, float volume)
+    {
+        float out = in;
 
         // User tone control
-        lp_tone.setFc(get_freq(tone) / sample_rate);
+        lp_tone.setFc(get_freq(tone) / samplerate);
         out = lp_tone.process(out);
 
         // Adjust output gain
-        float gain = volume / (3.f + drive * 10.f);
+        float gain = volume / (1.f + drive * 4.f);
 
         return (out * gain);
     }
 
-private:
-    float sample_rate;
-
     float get_freq(float tone)
     {
-        return fmap(tone, 1800, 6000, Mapping::LOG);
+        return fmap(tone, 1200, 12000, Mapping::LOG);
     }
 
     float get_q(float tone)
@@ -122,5 +168,6 @@ private:
     jkoDSP::Biquad hp_pre;
 
     jkoDSP::Biquad lp_tone;
-    jkoDSP::Biquad lp_anti;
+    jkoDSP::Biquad lp_anti_pre;
+    jkoDSP::Biquad lp_anti_post;
 };
