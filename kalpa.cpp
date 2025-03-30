@@ -42,14 +42,23 @@ float driveA = 0.f;
 float toneA = 0.f;
 float volumeA = 0.f;
 
+float freq = 100.f;
+float Q = 1.f;
+float gain = 1.f;
+
 float samplerate;
-float coeff = 0.002f;
 
 float smooth_drive = 0.f;
 float smooth_tone = 0.f;
 float smooth_volume = 0.f;
 
+float smooth_freq = 100.f;
+float smooth_Q = 1.f;
+float smooth_gain = 1.f;
+
 DcBlock blocker;
+
+float coeff = 0.0001f;
 
 float processA(float in)
 {
@@ -59,14 +68,40 @@ float processA(float in)
         return in;
     }
 
-    float coeff = 1.f / (0.01f * samplerate); // 10ms ramp to target setting
+    out = distA.softClip(in, smooth_drive, smooth_tone, smooth_volume);
+
+    return out;
+}
+
+void ProcessControls()
+{
+    driveA = hw.GetKnobValue(Hothouse::KNOB_1);
+    toneA = hw.GetKnobValue(Hothouse::KNOB_2);
+    volumeA = hw.GetKnobValue(Hothouse::KNOB_3);
+
+    freq = hw.GetKnobValue(Hothouse::KNOB_4);
+    freq = fmap(freq, 160, 3600, Mapping::LINEAR);
+
+    Q = hw.GetKnobValue(Hothouse::KNOB_5);
+    Q = fmap(Q, 0.5f, 3.f, Mapping::LINEAR);
+
+    gain = hw.GetKnobValue(Hothouse::KNOB_6);
+    gain = fmap(gain, -12.f, 12.0f, Mapping::LINEAR);
+
     daisysp::fonepole(smooth_drive, driveA, coeff);
     daisysp::fonepole(smooth_tone, toneA, coeff);
     daisysp::fonepole(smooth_volume, volumeA, coeff);
 
-    out = distA.softClip(in, smooth_drive, smooth_tone, smooth_volume);
+    daisysp::fonepole(smooth_freq, freq, coeff / 2.f);
+    daisysp::fonepole(smooth_Q, Q, coeff / 2.f);
+    daisysp::fonepole(smooth_gain, gain, coeff / 2.f);
 
-    return out;
+    // Toggle LEDs based on footswitches
+    bypassA ^= hw.switches[Hothouse::FOOTSWITCH_1].RisingEdge();
+    bypassB ^= hw.switches[Hothouse::FOOTSWITCH_2].RisingEdge();
+
+    led1_on ^= hw.switches[Hothouse::FOOTSWITCH_1].RisingEdge();
+    led2_on ^= hw.switches[Hothouse::FOOTSWITCH_2].RisingEdge();
 }
 
 void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out,
@@ -74,16 +109,8 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out,
 {
     hw.ProcessAllControls();
 
-    bypassA ^= hw.switches[Hothouse::FOOTSWITCH_1].RisingEdge();
-    bypassB ^= hw.switches[Hothouse::FOOTSWITCH_2].RisingEdge();
-
-    // Toggle LEDs based on footswitches
-    led1_on ^= hw.switches[Hothouse::FOOTSWITCH_1].RisingEdge();
-    led2_on ^= hw.switches[Hothouse::FOOTSWITCH_2].RisingEdge();
-
-    driveA = hw.GetKnobValue(Hothouse::KNOB_1);
-    toneA = hw.GetKnobValue(Hothouse::KNOB_2);
-    volumeA = hw.GetKnobValue(Hothouse::KNOB_3);
+    ProcessControls();
+    distA.setPrePeak(smooth_freq, smooth_Q, smooth_gain);
 
     float output = 0.0f;
     float input = 0.0f;
@@ -111,6 +138,7 @@ int main()
     // DaisySeed::StartLog();
 
     samplerate = hw.AudioSampleRate();
+    coeff = 1.f / (0.01f * samplerate); // 10ms ramp to target setting
 
     distA.init(samplerate);
     blocker.Init(samplerate);

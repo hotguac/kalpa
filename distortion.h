@@ -45,6 +45,16 @@ public:
         init_post();
     }
 
+    void setPrePeak(float freq, float Q, float gain)
+    {
+        peak_pre.setBiquad(jkoDSP::bq_type_peak, freq / samplerate, Q, gain);
+    }
+
+    void setPostPeak(float freq, float Q, float gain)
+    {
+        peak_post.setBiquad(jkoDSP::bq_type_peak, freq / samplerate, Q, gain);
+    }
+
     float softClip(float in, float drive, float tone, float volume)
     {
         float out = in;
@@ -79,6 +89,11 @@ private:
         hp_pre.setType(jkoDSP::bq_type_highpass);
         hp_pre.setFc(hp_pre_hz / samplerate);
         hp_pre.setQ(0.707f);
+
+        peak_pre.setType(jkoDSP::bq_type_peak);
+        peak_pre.setFc(500.f / samplerate);
+        peak_pre.setQ(1.f);
+        peak_pre.setPeakGain(-3.f);
     }
 
     void init_nolinear()
@@ -97,6 +112,11 @@ private:
         lp_tone.setType(jkoDSP::bq_type_lowpass);
         lp_tone.setFc(lp_pre_hz / samplerate);
         lp_tone.setQ(0.707f);
+
+        peak_post.setType(jkoDSP::bq_type_peak);
+        peak_post.setFc(1000.f / samplerate);
+        peak_post.setQ(1.f);
+        peak_post.setPeakGain(6.f);
     }
 
     // Pre-clip EQ
@@ -106,6 +126,8 @@ private:
 
         out = lp_pre.process(out);
         out = hp_pre.process(out);
+
+        out = peak_pre.process(out);
 
         return out;
     }
@@ -117,7 +139,7 @@ private:
         // add drive to increase distortion
         // add offset to increase assymetry
         const float offset = -0.1f;
-        float preGain = fmap(drive, 4.f, 120.f, Mapping::EXP);
+        float preGain = fmap(drive, 12.f, 140.f, Mapping::EXP);
 
         for (int i = 0; i < 2; ++i) {
             if (i == 0) {
@@ -143,6 +165,8 @@ private:
     float post_process(float in, float drive, float tone, float volume)
     {
         float out = in;
+
+        out = peak_post.process(out);
 
         // User tone control
         lp_tone.setFc(get_freq(tone) / samplerate);
@@ -170,4 +194,7 @@ private:
     jkoDSP::Biquad lp_tone;
     jkoDSP::Biquad lp_anti_pre;
     jkoDSP::Biquad lp_anti_post;
+
+    jkoDSP::Biquad peak_pre;
+    jkoDSP::Biquad peak_post;
 };
