@@ -139,14 +139,14 @@ private:
         // add drive to increase distortion
         // add offset to increase assymetry
         const float offset = -0.1f;
-        float preGain = fmap(drive, 12.f, 140.f, Mapping::EXP);
 
         for (int i = 0; i < 2; ++i) {
             if (i == 0) {
                 out = 0.f;
             } else {
-                out = in * preGain + offset;
+                out = in * drive + offset;
             }
+
             // Anti-aliasing filter
             out = lp_anti_pre.process(out);
 
@@ -173,7 +173,7 @@ private:
         out = lp_tone.process(out);
 
         // Adjust output gain
-        float gain = volume / (1.f + drive * 4.f);
+        float gain = volume / (1.f + drive * 0.2f);
 
         return (out * gain);
     }

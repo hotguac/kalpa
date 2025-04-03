@@ -35,6 +35,8 @@ bool led1_on = false, led2_on = false;
 bool bypassA = true, bypassB = true;
 
 Distortion distA;
+daisysp::ChorusEngine chorus;
+bool use_chorus = false;
 
 float current_sample = 0.f;
 
@@ -76,14 +78,44 @@ float processA(float in)
 void ProcessControls()
 {
     driveA = hw.GetKnobValue(Hothouse::KNOB_1);
+    driveA = fmap(driveA, 12.f, 140.f, Mapping::EXP);
+
+    Hothouse::ToggleswitchPosition sw1 = hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_1);
+    if (sw1 == Hothouse::ToggleswitchPosition::TOGGLESWITCH_MIDDLE) {
+        driveA *= 2.f; // +6db
+    } else if (sw1 == Hothouse::ToggleswitchPosition::TOGGLESWITCH_DOWN) {
+        driveA *= 4.f; // +12db
+    }
+
+    Hothouse::ToggleswitchPosition sw2 = hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_2);
+    switch (sw2) {
+    case Hothouse::TOGGLESWITCH_UP:
+        chorus.SetFeedback(0.2f);
+        chorus.SetLfoDepth(0.1f);
+        chorus.SetLfoFreq(2.f);
+        use_chorus = true;
+        break;
+
+    case Hothouse::TOGGLESWITCH_MIDDLE:
+        chorus.SetFeedback(0.3f);
+        chorus.SetLfoDepth(0.2f);
+        chorus.SetLfoFreq(1.5f);
+        use_chorus = true;
+        break;
+
+    default:
+        use_chorus = false;
+        break;
+    }
+
     toneA = hw.GetKnobValue(Hothouse::KNOB_2);
     volumeA = hw.GetKnobValue(Hothouse::KNOB_3);
 
     freq = hw.GetKnobValue(Hothouse::KNOB_4);
-    freq = fmap(freq, 160, 3600, Mapping::LINEAR);
+    freq = fmap(freq, 160, 3000, Mapping::LOG);
 
     Q = hw.GetKnobValue(Hothouse::KNOB_5);
-    Q = fmap(Q, 0.5f, 3.f, Mapping::LINEAR);
+    Q = fmap(Q, 0.5f, 1.5f, Mapping::LINEAR);
 
     gain = hw.GetKnobValue(Hothouse::KNOB_6);
     gain = fmap(gain, -12.f, 12.0f, Mapping::LINEAR);
@@ -125,6 +157,11 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out,
         }
 
         output = blocker.Process(output);
+        if (use_chorus) {
+            float wet = chorus.Process(output);
+            output = (output + wet) * 0.5f;
+        }
+
         out[0][i] = out[1][i] = DSY_CLAMP(output, -0.90f, 0.92f);
     }
 }
@@ -142,6 +179,8 @@ int main()
 
     distA.init(samplerate);
     blocker.Init(samplerate);
+
+    chorus.Init(samplerate);
 
     led_1.Init(hw.seed.GetPin(Hothouse::LED_1), false);
     led_2.Init(hw.seed.GetPin(Hothouse::LED_2), false);
