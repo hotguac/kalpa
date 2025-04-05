@@ -17,6 +17,7 @@
 // ### Uncomment if IntelliSense can't resolve DaisySP-LGPL classes ###
 // #include "daisysp-lgpl.h"
 
+#include "daisy_seed.h"
 #include "daisysp-lgpl.h"
 #include "daisysp.h"
 #include "distortion.h"
@@ -29,6 +30,7 @@ using daisy::SaiHandle;
 using daisysp::DcBlock;
 
 Hothouse hw;
+DaisySeed hw2;
 
 Led led_1, led_2;
 bool led1_on = false, led2_on = false;
@@ -61,6 +63,8 @@ float smooth_gain = 1.f;
 DcBlock blocker;
 
 float coeff = 0.0001f;
+
+daisy::CpuLoadMeter loadMeter;
 
 float processA(float in)
 {
@@ -139,6 +143,7 @@ void ProcessControls()
 void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out,
     size_t size)
 {
+    // loadMeter.OnBlockStart();
     hw.ProcessAllControls();
 
     ProcessControls();
@@ -164,7 +169,10 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out,
 
         out[0][i] = out[1][i] = DSY_CLAMP(output, -0.90f, 0.92f);
     }
+    // loadMeter.OnBlockEnd();
 }
+
+bool toggle_state = false;
 
 int main()
 {
@@ -172,7 +180,7 @@ int main()
     hw.SetAudioBlockSize(96); // Number of samples handled per callback
     hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_96KHZ);
 
-    // DaisySeed::StartLog();
+    // hw2.StartLog(false);
 
     samplerate = hw.AudioSampleRate();
     coeff = 1.f / (0.01f * samplerate); // 10ms ramp to target setting
@@ -188,12 +196,30 @@ int main()
     hw.StartAdc();
     hw.StartAudio(AudioCallback);
 
-    // DaisySeed::PrintLine("starting");
-
     while (true) {
         hw.DelayMs(10);
 
-        // DaisySeed::PrintLine("looping");
+        if (led2_on && (toggle_state == false)) {
+            // hw2.Print("Settings:: ");
+            // hw2.Print("freq: " FLT_FMT(1), FLT_VAR(1, freq));
+            // hw2.Print("  Q: " FLT_FMT3, FLT_VAR3(Q));
+            // hw2.PrintLine("  gain: " FLT_FMT3, FLT_VAR3(gain));
+            // toggle_state = true;
+
+            // get the current load (smoothed value and peak values)
+            // const float avgLoad = loadMeter.GetAvgCpuLoad();
+            // const float maxLoad = loadMeter.GetMaxCpuLoad();
+            // const float minLoad = loadMeter.GetMinCpuLoad();
+            // // print it to the serial connection (as percentages)
+            // hw2.Print("Processing Load %:  ");
+            // hw2.Print("Max: " FLT_FMT3, FLT_VAR3(maxLoad * 100.0f));
+            // hw2.Print("  Avg: " FLT_FMT3, FLT_VAR3(avgLoad * 100.0f));
+            // hw2.PrintLine("  Min: " FLT_FMT3, FLT_VAR3(minLoad * 100.0f));
+        }
+
+        if (!led2_on) {
+            toggle_state = false;
+        }
 
         // Toggle effect bypass LED when footswitch is pressed
         // Toggle LEDs
