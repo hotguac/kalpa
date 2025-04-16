@@ -17,17 +17,11 @@
 // ### Uncomment if IntelliSense can't resolve DaisySP-LGPL classes ###
 // #include "daisysp-lgpl.h"
 
-#include "daisy_seed.h"
-#include "daisysp-lgpl.h"
-#include "daisysp.h"
-#include "distortion.h"
-#include "hothouse.h"
+#include "controller.h"
 
 using clevelandmusicco::Hothouse;
-using daisy::AudioHandle;
 using daisy::Led;
 using daisy::SaiHandle;
-using daisysp::DcBlock;
 
 Hothouse hw;
 DaisySeed hw2;
@@ -36,108 +30,21 @@ Led led_1, led_2;
 bool led1_on = false, led2_on = false;
 bool bypassA = true, bypassB = true;
 
-Distortion distA;
-daisysp::ChorusEngine chorus;
-bool use_chorus = false;
+bool toggle_state = false;
 
-float current_sample = 0.f;
+jkoDSP::Controller controller;
 
-float driveA = 0.f;
-float toneA = 0.f;
-float volumeA = 0.f;
-
-float freq = 100.f;
-float Q = 1.f;
-float gain = 1.f;
-
-float samplerate;
-
-float smooth_drive = 0.f;
-float smooth_tone = 0.f;
-float smooth_volume = 0.f;
-
-float smooth_freq = 100.f;
-float smooth_Q = 1.f;
-float smooth_gain = 1.f;
-
-DcBlock blocker;
-
-float coeff = 0.0001f;
-
-daisy::CpuLoadMeter loadMeter;
-
-float processA(float in)
+void PrintLoad()
 {
-    float out = 0.0f;
-
-    if (bypassA) {
-        return in;
-    }
-
-    out = distA.softClip(in, smooth_drive, smooth_tone, smooth_volume);
-
-    return out;
-}
-
-void ProcessControls()
-{
-    driveA = hw.GetKnobValue(Hothouse::KNOB_1);
-    driveA = fmap(driveA, 12.f, 140.f, Mapping::EXP);
-
-    Hothouse::ToggleswitchPosition sw1 = hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_1);
-    if (sw1 == Hothouse::ToggleswitchPosition::TOGGLESWITCH_MIDDLE) {
-        driveA *= 2.f; // +6db
-    } else if (sw1 == Hothouse::ToggleswitchPosition::TOGGLESWITCH_DOWN) {
-        driveA *= 4.f; // +12db
-    }
-
-    Hothouse::ToggleswitchPosition sw2 = hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_2);
-    switch (sw2) {
-    case Hothouse::TOGGLESWITCH_UP:
-        chorus.SetFeedback(0.2f);
-        chorus.SetLfoDepth(0.1f);
-        chorus.SetLfoFreq(2.f);
-        use_chorus = true;
-        break;
-
-    case Hothouse::TOGGLESWITCH_MIDDLE:
-        chorus.SetFeedback(0.3f);
-        chorus.SetLfoDepth(0.2f);
-        chorus.SetLfoFreq(1.5f);
-        use_chorus = true;
-        break;
-
-    default:
-        use_chorus = false;
-        break;
-    }
-
-    toneA = hw.GetKnobValue(Hothouse::KNOB_2);
-    volumeA = hw.GetKnobValue(Hothouse::KNOB_3);
-
-    freq = hw.GetKnobValue(Hothouse::KNOB_4);
-    freq = fmap(freq, 160, 3000, Mapping::LOG);
-
-    Q = hw.GetKnobValue(Hothouse::KNOB_5);
-    Q = fmap(Q, 0.5f, 1.5f, Mapping::LINEAR);
-
-    gain = hw.GetKnobValue(Hothouse::KNOB_6);
-    gain = fmap(gain, -12.f, 12.0f, Mapping::LINEAR);
-
-    daisysp::fonepole(smooth_drive, driveA, coeff);
-    daisysp::fonepole(smooth_tone, toneA, coeff);
-    daisysp::fonepole(smooth_volume, volumeA, coeff);
-
-    daisysp::fonepole(smooth_freq, freq, coeff / 2.f);
-    daisysp::fonepole(smooth_Q, Q, coeff / 2.f);
-    daisysp::fonepole(smooth_gain, gain, coeff / 2.f);
-
-    // Toggle LEDs based on footswitches
-    bypassA ^= hw.switches[Hothouse::FOOTSWITCH_1].RisingEdge();
-    bypassB ^= hw.switches[Hothouse::FOOTSWITCH_2].RisingEdge();
-
-    led1_on ^= hw.switches[Hothouse::FOOTSWITCH_1].RisingEdge();
-    led2_on ^= hw.switches[Hothouse::FOOTSWITCH_2].RisingEdge();
+    // get the current load (smoothed value and peak values)
+    // const float avgLoad = loadMeter.GetAvgCpuLoad();
+    // const float maxLoad = loadMeter.GetMaxCpuLoad();
+    // const float minLoad = loadMeter.GetMinCpuLoad();
+    // // print it to the serial connection (as percentages)
+    // hw2.Print("Processing Load %:  ");
+    // hw2.Print("Max: " FLT_FMT3, FLT_VAR3(maxLoad * 100.0f));
+    // hw2.Print("  Avg: " FLT_FMT3, FLT_VAR3(avgLoad * 100.0f));
+    // hw2.PrintLine("  Min: " FLT_FMT3, FLT_VAR3(minLoad * 100.0f));
 }
 
 void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out,
@@ -146,75 +53,59 @@ void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out,
     // loadMeter.OnBlockStart();
     hw.ProcessAllControls();
 
-    ProcessControls();
-    distA.setPrePeak(smooth_freq, smooth_Q, smooth_gain);
+    //
+    // Toggle LEDs based on footswitches
+    //
+    bypassA ^= hw.switches[Hothouse::FOOTSWITCH_1].RisingEdge();
+    bypassB ^= hw.switches[Hothouse::FOOTSWITCH_2].RisingEdge();
 
-    float output = 0.0f;
-    float input = 0.0f;
+    led1_on ^= hw.switches[Hothouse::FOOTSWITCH_1].RisingEdge();
+    led2_on ^= hw.switches[Hothouse::FOOTSWITCH_2].RisingEdge();
 
-    for (size_t i = 0; i < size; ++i) {
-        input = in[0][i]; // + denormal_guard;
+    controller.ProcessControls(
+        hw.knobs[Hothouse::KNOB_1].Value(),
+        hw.knobs[Hothouse::KNOB_2].Value(),
+        hw.knobs[Hothouse::KNOB_3].Value(),
+        hw.knobs[Hothouse::KNOB_4].Value(),
+        hw.knobs[Hothouse::KNOB_5].Value(),
+        hw.knobs[Hothouse::KNOB_6].Value(),
+        hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_1),
+        hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_2),
+        hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_3),
+        !bypassA,
+        !bypassB);
 
-        if (bypassA) {
-            output = input;
-        } else {
-            output = processA(input);
-        }
+    controller.process(in, out, size);
 
-        output = blocker.Process(output);
-        if (use_chorus) {
-            float wet = chorus.Process(output);
-            output = (output + wet) * 0.5f;
-        }
-
-        out[0][i] = out[1][i] = DSY_CLAMP(output, -0.90f, 0.92f);
-    }
     // loadMeter.OnBlockEnd();
 }
 
-bool toggle_state = false;
-
-int main()
+void Init()
 {
-    hw.Init();
+    hw.Init(true);
     hw.SetAudioBlockSize(96); // Number of samples handled per callback
     hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_96KHZ);
-
-    // hw2.StartLog(false);
-
-    samplerate = hw.AudioSampleRate();
-    coeff = 1.f / (0.01f * samplerate); // 10ms ramp to target setting
-
-    distA.init(samplerate);
-    blocker.Init(samplerate);
-
-    chorus.Init(samplerate);
 
     led_1.Init(hw.seed.GetPin(Hothouse::LED_1), false);
     led_2.Init(hw.seed.GetPin(Hothouse::LED_2), false);
 
+    controller.init(hw.AudioSampleRate());
+
     hw.StartAdc();
     hw.StartAudio(AudioCallback);
+}
+
+int main()
+{
+    // hw2.StartLog(false);
+    Init();
 
     while (true) {
         hw.DelayMs(10);
 
         if (led2_on && (toggle_state == false)) {
-            // hw2.Print("Settings:: ");
-            // hw2.Print("freq: " FLT_FMT(1), FLT_VAR(1, freq));
-            // hw2.Print("  Q: " FLT_FMT3, FLT_VAR3(Q));
-            // hw2.PrintLine("  gain: " FLT_FMT3, FLT_VAR3(gain));
-            // toggle_state = true;
-
-            // get the current load (smoothed value and peak values)
-            // const float avgLoad = loadMeter.GetAvgCpuLoad();
-            // const float maxLoad = loadMeter.GetMaxCpuLoad();
-            // const float minLoad = loadMeter.GetMinCpuLoad();
-            // // print it to the serial connection (as percentages)
-            // hw2.Print("Processing Load %:  ");
-            // hw2.Print("Max: " FLT_FMT3, FLT_VAR3(maxLoad * 100.0f));
-            // hw2.Print("  Avg: " FLT_FMT3, FLT_VAR3(avgLoad * 100.0f));
-            // hw2.PrintLine("  Min: " FLT_FMT3, FLT_VAR3(minLoad * 100.0f));
+            PrintLoad();
+            // hw2.PrintLine("Toggle state: %d", hw.GetToggleswitchPosition(Hothouse::TOGGLESWITCH_2));
         }
 
         if (!led2_on) {
@@ -222,7 +113,6 @@ int main()
         }
 
         // Toggle effect bypass LED when footswitch is pressed
-        // Toggle LEDs
         led_1.Set(led1_on ? 1.0f : 0.0f);
         led_1.Update();
         led_2.Set(led2_on ? 1.0f : 0.0f);
@@ -231,5 +121,6 @@ int main()
         // Call System::ResetToBootloader() if FOOTSWITCH_1 is pressed for 2 seconds
         hw.CheckResetToBootloader();
     }
+
     return 0;
 }
