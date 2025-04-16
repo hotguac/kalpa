@@ -54,45 +54,39 @@ public:
         float delaytime = 0.1f;
 
         fonepole(fx_intensity, intensity, coeff);
-        // fx_intensity = intensity;
+
         fx_type = fxtyp;
 
         switch (fx_type) {
         case EffectType::SLAP:
-            delaytime = fmap(fx_intensity, 0.01f, 0.05f, Mapping::EXP);
+            delaytime = fmap(fx_intensity, 0.06f, 0.120f, Mapping::EXP);
             delay.SetDelay(delaytime * samplerate);
+            // delay.SetDelay(46000.f);
             break;
         case EffectType::REVERB:
-            feedback = fmap(fx_intensity, 0.1f, 0.3f, Mapping::EXP);
-            depth = fmap(fx_intensity, 0.1f, 0.2f, Mapping::EXP);
-            freq = fmap(fx_intensity, 2.f, 1.5f, Mapping::EXP);
+            feedback = fmap(fx_intensity, 0.6f, 0.8f, Mapping::EXP);
+            depth = fmap(fx_intensity, 0.3f, 0.5f, Mapping::EXP);
+            freq = fmap(fx_intensity, 1.f, 2.5f, Mapping::EXP);
 
-            // fonepole(reverbFeedback, feedback, coeff);
-            // fonepole(reverbDepth, depth, coeff);
-            // fonepole(reverbFreq, freq, coeff);
+            fonepole(reverbFeedback, feedback, coeff);
+            fonepole(reverbDepth, depth, coeff);
+            fonepole(reverbFreq, freq, coeff);
 
-            reverbFeedback = feedback;
-            reverbDepth = depth;
-            reverbFreq = freq;
-
-            reverb.SetFeedback(chorusFeedback);
-            reverb.SetLfoDepth(chorusDepth);
-            reverb.SetLfoFreq(chorusFreq);
-
+            reverb.SetDelayMs(60.f);
+            reverb.SetFeedback(reverbFeedback);
+            reverb.SetLfoDepth(reverbDepth);
+            reverb.SetLfoFreq(reverbFreq);
             break;
         case EffectType::CHORUS:
-            feedback = fmap(fx_intensity, 0.1f, 0.9f, Mapping::EXP);
-            depth = fmap(fx_intensity, 0.1f, 0.9f, Mapping::EXP);
-            freq = fmap(fx_intensity, 1.f, 3.5f, Mapping::EXP);
+            feedback = fmap(fx_intensity, 0.5f, 0.8f, Mapping::EXP);
+            depth = fmap(fx_intensity, 0.08f, 0.1f, Mapping::EXP);
+            freq = fmap(fx_intensity, 1.f, 2.0f, Mapping::EXP);
 
-            chorusFeedback = feedback;
-            chorusDepth = depth;
-            chorusFreq = freq;
+            fonepole(chorusFeedback, feedback, coeff);
+            fonepole(chorusDepth, depth, coeff);
+            fonepole(chorusFreq, freq, coeff);
 
-            // fonepole(chorusFeedback, feedback, coeff);
-            // fonepole(chorusDepth, depth, coeff);
-            // fonepole(chorusFreq, freq, coeff);
-
+            chorus.SetDelayMs(6.f);
             chorus.SetFeedback(chorusFeedback);
             chorus.SetLfoDepth(chorusDepth);
             chorus.SetLfoFreq(chorusFreq);
@@ -115,26 +109,29 @@ public:
     void process(AudioHandle::OutputBuffer out, size_t size)
     {
         float output = 0.f;
-        float mix = fmap(fx_intensity, 0.f, 0.9f, Mapping::LOG);
-
-        mix = 0.5f;
+        float mix = 0.5f;
 
         for (size_t i = 0; i < size; ++i) {
             output = out[0][i];
-            output = lp_tone.process(output);
 
-            // TODO: add a connection to the fx control for mix level
+            if (useToneVol) {
+                output = lp_tone.process(output);
+            }
+
             if (useFX) {
                 switch (fx_type) {
                 case EffectType::SLAP:
-                    output = output * (1.f - mix) + reverb.Process(output) * mix;
+                    mix = fmap(fx_intensity, 0.1f, 0.4f, Mapping::LINEAR);
+                    delay.Write(output);
+                    output = output * (1.2f - mix) + delay.Read() * mix;
                     break;
                 case EffectType::REVERB:
-                    delay.Write(output);
-                    output = output * (1.f - mix) + delay.Read() * mix;
+                    mix = fmap(fx_intensity, 0.6f, 1.2f, Mapping::LINEAR);
+                    output = output * (1.2f - mix) + reverb.Process(output) * mix;
                     break;
                 case EffectType::CHORUS:
-                    output = output * (1.f - mix) + chorus.Process(output) * mix;
+                    mix = fmap(fx_intensity, 0.6f, 1.3f, Mapping::LINEAR);
+                    output = output * (1.3f - mix) + chorus.Process(output) * mix;
                     break;
                 default:
                     // shouldn't get here
@@ -143,7 +140,11 @@ public:
             }
 
             output = blocker.Process(output);
-            out[0][i] = out[1][i] = DSY_CLAMP(output * volume, -0.94f, 0.92f);
+            if (useToneVol) {
+                out[0][i] = out[1][i] = DSY_CLAMP(output * volume, -0.94f, 0.92f);
+            } else {
+                out[0][i] = out[1][i] = DSY_CLAMP(output, -0.94f, 0.92f);
+            }
         }
     };
 
