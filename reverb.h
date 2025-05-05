@@ -4,15 +4,32 @@
 #include "daisysp.h"
 #include "diffusor.h"
 
-// #include <cstddef>
-daisysp::DelayLine<float, 461> DSY_SDRAM_BSS lineDiff1;
-daisysp::DelayLine<float, 347> DSY_SDRAM_BSS lineDiff2;
-daisysp::DelayLine<float, 1223> DSY_SDRAM_BSS lineDiff3;
-daisysp::DelayLine<float, 907> DSY_SDRAM_BSS lineDiff4;
-daisysp::DelayLine<float, 2237> DSY_SDRAM_BSS lineDiff5;
-daisysp::DelayLine<float, 5807> DSY_SDRAM_BSS lineDiff6;
-daisysp::DelayLine<float, 2999> DSY_SDRAM_BSS lineDiff7;
-daisysp::DelayLine<float, 8573> DSY_SDRAM_BSS lineDiff8;
+static constexpr int sMaxExcursion = 60;
+
+static constexpr int sPreDelayLength = 4800;
+static constexpr int sDiffuserDelay1 = 461;
+static constexpr int sDiffuserDelay2 = 347;
+static constexpr int sDiffuserDelay3 = 1223;
+static constexpr int sDiffuserDelay4 = 907;
+static constexpr int sDiffuserDelay5 = 2237; // +/- Excursion
+static constexpr int sDiffuserDelay6 = 5807;
+static constexpr int sDiffuserDelay7 = 2999; // +/- Excursion
+static constexpr int sDiffuserDelay8 = 8573;
+
+static constexpr int sTankDelay5 = 14369;
+static constexpr int sTankDelay6 = 12007;
+static constexpr int sTankDelay7 = 13613;
+static constexpr int sTankDelay8 = 10211;
+
+// Stored in SDRAM because not enough room in base RAM
+daisysp::DelayLine<float, sDiffuserDelay1 + 2> DSY_SDRAM_BSS lineDiff1;
+daisysp::DelayLine<float, sDiffuserDelay2 + 2> DSY_SDRAM_BSS lineDiff2;
+daisysp::DelayLine<float, sDiffuserDelay3 + 2> DSY_SDRAM_BSS lineDiff3;
+daisysp::DelayLine<float, sDiffuserDelay4 + 2> DSY_SDRAM_BSS lineDiff4;
+daisysp::DelayLine<float, sDiffuserDelay5 + 2> DSY_SDRAM_BSS lineDiff5;
+daisysp::DelayLine<float, sDiffuserDelay6 + 2> DSY_SDRAM_BSS lineDiff6;
+daisysp::DelayLine<float, sDiffuserDelay7 + 2> DSY_SDRAM_BSS lineDiff7;
+daisysp::DelayLine<float, sDiffuserDelay8 + 2> DSY_SDRAM_BSS lineDiff8;
 
 class Damper {
 public:
@@ -57,40 +74,25 @@ public:
         preDelay.SetDelay(mPreDelay);
 
         diff1.Init(&lineDiff1);
-        diff1.setDiffusion(mInputDiffusion1);
-
         diff2.Init(&lineDiff2);
-        diff2.setDiffusion(mInputDiffusion1);
-
         diff3.Init(&lineDiff3);
-        diff3.setDiffusion(mInputDiffusion2);
-
         diff4.Init(&lineDiff4);
-        diff4.setDiffusion(mInputDiffusion2);
-
         diff5.Init(&lineDiff5);
-        diff5.setDiffusion(mDecayDiffusion1);
-
         diff6.Init(&lineDiff6);
-        diff6.setDiffusion(mDecayDiffusion2);
-
         diff7.Init(&lineDiff7);
-        diff7.setDiffusion(mDecayDiffusion1);
-
         diff8.Init(&lineDiff8);
-        diff8.setDiffusion(mDecayDiffusion2);
 
         tank5.Init();
-        tank5.SetDelay(static_cast<float>(sTankDelay5));
+        tank5.SetDelay(static_cast<float>(sTankDelay5 - 2));
 
         tank6.Init();
-        tank6.SetDelay(static_cast<float>(sTankDelay6));
+        tank6.SetDelay(static_cast<float>(sTankDelay6 - 2));
 
         tank7.Init();
-        tank7.SetDelay(static_cast<float>(sTankDelay7));
+        tank7.SetDelay(static_cast<float>(sTankDelay7 - 2));
 
         tank8.Init();
-        tank8.SetDelay(static_cast<float>(sTankDelay8));
+        tank8.SetDelay(static_cast<float>(sTankDelay8 - 2));
     }
 
    // Process a single sample
@@ -98,11 +100,6 @@ public:
     {
         // TODO: fix this auto generated code
         float outputSample = ProcessEarly(inputSample);
-
-
-        // return outputSample;
-
-
 
         // Send to tank loops 5,6,7,8
         float leftTank = outputSample + mLastTank8 * mDecay;
@@ -146,42 +143,25 @@ public:
     };
 
 private:
-    static constexpr int sMaxExcursion = 60;
-
-    static constexpr int sPreDelayLength = 4800;
-    static constexpr int sDiffuserDelay1 = 461;
-    static constexpr int sDiffuserDelay2 = 347;
-    static constexpr int sDiffuserDelay3 = 1223;
-    static constexpr int sDiffuserDelay4 = 907;
-    static constexpr int sDiffuserDelay5 = 2237; // +/- Excursion
-    static constexpr int sDiffuserDelay6 = 5807;
-    static constexpr int sDiffuserDelay7 = 2999; // +/- Excursion
-    static constexpr int sDiffuserDelay8 = 8573;
-
-    static constexpr int sTankDelay5 = 14369;
-    static constexpr int sTankDelay6 = 12007;
-    static constexpr int sTankDelay7 = 13613;
-    static constexpr int sTankDelay8 = 10211;
-
     daisysp::DelayLine<float, sPreDelayLength> preDelay;
 
     // Input diffusion delay lines
-    Diffusor<float, sDiffuserDelay1> diff1;
-    Diffusor<float, sDiffuserDelay2> diff2;
-    Diffusor<float, sDiffuserDelay3> diff3;
-    Diffusor<float, sDiffuserDelay4> diff4;
+    Diffusor<float, sDiffuserDelay1 + 2> diff1;
+    Diffusor<float, sDiffuserDelay2 + 2> diff2;
+    Diffusor<float, sDiffuserDelay3 + 2> diff3;
+    Diffusor<float, sDiffuserDelay4 + 2> diff4;
 
     // Tank diffusion delay lines 5,6 left, 7,8 right
-    Diffusor<float, sDiffuserDelay5, sMaxExcursion, true> diff5;
+    Diffusor<float, sDiffuserDelay5 + 2, sMaxExcursion, true> diff5;
     daisysp::DelayLine<float, sTankDelay5> tank5;
 
-    Diffusor<float, sDiffuserDelay6, 0, false> diff6;
+    Diffusor<float, sDiffuserDelay6 + 2, 0, false> diff6;
     daisysp::DelayLine<float, sTankDelay6> tank6;
 
-    Diffusor<float, sDiffuserDelay7, sMaxExcursion, true> diff7;
+    Diffusor<float, sDiffuserDelay7 + 2, sMaxExcursion, true> diff7;
     daisysp::DelayLine<float, sTankDelay7> tank7;
 
-    Diffusor<float, sDiffuserDelay8, 0, false> diff8;
+    Diffusor<float, sDiffuserDelay8 + 2, 0, false> diff8;
     daisysp::DelayLine<float, sTankDelay8> tank8;
 
     void updateCoefficients();
@@ -221,10 +201,10 @@ private:
         mLastAccum1 = outputSample;
 
         // Apply input diffusion
-        outputSample = diff1.Process(outputSample);
-        outputSample = diff2.Process(outputSample);
-        outputSample = diff3.Process(outputSample);
-        outputSample = diff4.Process(outputSample);
+        outputSample = diff1.Process(outputSample, sDiffuserDelay1, mInputDiffusion1);
+        outputSample = diff2.Process(outputSample, sDiffuserDelay2, mInputDiffusion1);
+        outputSample = diff3.Process(outputSample, sDiffuserDelay3, mInputDiffusion2);
+        outputSample = diff4.Process(outputSample, sDiffuserDelay4, mInputDiffusion2);
 
         return outputSample;
     }
@@ -232,14 +212,14 @@ private:
     float ProcessLeftTank(float inputSample)
     {
         // Process the left tank (5,6)
-        float outputSample = diff5.Process(inputSample);
+        float outputSample = diff5.Process(inputSample, sDiffuserDelay5, -mDecayDiffusion1);
         tank5.Write(outputSample);
 
         outputSample = tank5.Read() * (1 - mDamping);
         outputSample = leftTankDamper.Process(outputSample, mDamping);
 
         outputSample *= mDecay;
-        outputSample = diff6.Process(outputSample);
+        outputSample = diff6.Process(outputSample, sDiffuserDelay6, mDecayDiffusion1);
         tank6.Write(outputSample);
 
         return tank6.Read();
@@ -248,14 +228,14 @@ private:
     float ProcessRightTank(float inputSample)
     {
         // Process the right tank (7,8)
-        float outputSample = diff7.Process(inputSample);
+        float outputSample = diff7.Process(inputSample, sDiffuserDelay7, -mDecayDiffusion2);
         tank7.Write(outputSample);
 
         outputSample = tank7.Read() * (1 - mDamping);
         outputSample = rightTankDamper.Process(outputSample, mDamping);
 
         outputSample *= mDecay;
-        outputSample = diff8.Process(outputSample);
+        outputSample = diff8.Process(outputSample, sDiffuserDelay8, mDecayDiffusion2);
         tank8.Write(outputSample);
 
         return tank8.Read();

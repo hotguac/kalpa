@@ -13,7 +13,7 @@ public:
     {
         mDelayLine = delayLine;
         mDelayLine->Init();
-        mDelayLine->SetDelay(MaxSize);
+        mDelayLine->SetDelay(MaxSize - 2);
     }
 
     void setExcursion(float excursion)
@@ -26,34 +26,10 @@ public:
         }
     }
 
-    void setDiffusion(float diffusion)
-    {
-        mDiffusion = diffusion;
-    }
-
-    float Process(float inputSample)
+    float Process(float inputSample, size_t delay, float diffusion)
     {
         // TODO: implement modulation
-        float accum1 = inputSample;
-
-        if (invert) {
-            accum1 += mLastRead * mDiffusion;
-        } else {
-            accum1 -= mLastRead * mDiffusion;
-        }
-
-        mDelayLine->Write(accum1);
-        mLastRead = mDelayLine->Read();
-
-        float accum2 = accum1;
-
-        if (invert) {
-            accum2 -= mLastRead * mDiffusion;
-        } else {
-            accum2 += mLastRead * mDiffusion;
-        }
-
-        return accum2;
+        return mDelayLine->Allpass(inputSample, delay - static_cast<size_t>(mExcursion), diffusion);
     }
 
     float Read(size_t position)
@@ -63,8 +39,6 @@ public:
 
 private:
     float mExcursion = 0.0f;
-    float mDiffusion = 0.0f;
-
     float mLastRead = 0.0f;
 
     daisysp::DelayLine<T, MaxSize> *mDelayLine;
