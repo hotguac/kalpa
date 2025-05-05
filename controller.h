@@ -126,10 +126,10 @@ void Controller::ProcessControls(float drive, float tone, float volume, float fr
         postprocess.setFX(fx_intensity, jkoDSP::EffectType::SLAP);
         break;
     case Hothouse::TOGGLESWITCH_MIDDLE:
-        postprocess.setFX(fx_intensity, jkoDSP::EffectType::REVERB);
+        postprocess.setFX(fx_intensity, jkoDSP::EffectType::AMBIENCE);
         break;
     case Hothouse::TOGGLESWITCH_DOWN:
-        postprocess.setFX(fx_intensity, jkoDSP::EffectType::CHORUS);
+        postprocess.setFX(fx_intensity, jkoDSP::EffectType::REVERB);
         break;
     default:
         // should never get here!!

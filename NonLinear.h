@@ -63,6 +63,14 @@ public:
                     // float xdrive = 2.8; -- good range 2 to 3 ish
                     // out = fast_tanh(out * xdrive) / fast_tanh(xdrive);
 
+                    // from "Digital Signal Processing for Audio Applications" by Udo Zölzer
+                    // Figure 6.5
+                    //
+                    // y(k) = x(k) when x(k) > x (k-1)
+                    // y(k) = x(k) cubed when x(k) <= x (k-1)
+                    //
+                    // this is supposed to create even harmonics plus first odd harmonic
+
                     // Anti-aliasing filter
                     output = lp_anti_post.process(output);
                 }

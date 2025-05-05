@@ -3,6 +3,7 @@
 
 #include "Biquad.h"
 #include "daisysp.h"
+#include "reverb.h"
 
 using daisysp::Mapping;
 
@@ -10,8 +11,8 @@ namespace jkoDSP {
 
 enum class EffectType {
     SLAP,
-    REVERB,
-    CHORUS
+    AMBIENCE,
+    REVERB
 };
 
 class PostProcessor {
@@ -22,8 +23,9 @@ public:
     void init(float samplerate)
     {
         this->samplerate = samplerate;
-        chorus.Init(samplerate);
+        reverb.Init(samplerate);
         blocker.Init(samplerate);
+        reverb2.Init();
 
         lp_tone.setType(jkoDSP::bq_type_lowpass);
         lp_tone.setFc(100.f / samplerate);
@@ -63,33 +65,33 @@ public:
             delay.SetDelay(delaytime * samplerate);
             // delay.SetDelay(46000.f);
             break;
-        case EffectType::REVERB:
-            feedback = fmap(fx_intensity, 0.6f, 0.8f, Mapping::EXP);
-            depth = fmap(fx_intensity, 0.3f, 0.5f, Mapping::EXP);
+        case EffectType::AMBIENCE:
+            feedback = fmap(fx_intensity, 0.1f, 0.2f, Mapping::EXP);
+            depth = fmap(fx_intensity, 0.1f, 0.3f, Mapping::EXP);
             freq = fmap(fx_intensity, 1.f, 2.5f, Mapping::EXP);
 
             fonepole(reverbFeedback, feedback, coeff);
             fonepole(reverbDepth, depth, coeff);
             fonepole(reverbFreq, freq, coeff);
 
-            reverb.SetDelayMs(60.f);
+            reverb.SetDelayMs(40.f);
             reverb.SetFeedback(reverbFeedback);
             reverb.SetLfoDepth(reverbDepth);
             reverb.SetLfoFreq(reverbFreq);
             break;
-        case EffectType::CHORUS:
-            feedback = fmap(fx_intensity, 0.5f, 0.8f, Mapping::EXP);
-            depth = fmap(fx_intensity, 0.08f, 0.1f, Mapping::EXP);
-            freq = fmap(fx_intensity, 1.f, 2.0f, Mapping::EXP);
+        case EffectType::REVERB:
+            feedback = fmap(fx_intensity, 0.2f, 0.6f, Mapping::EXP);
+            depth = fmap(fx_intensity, 0.3f, 0.5f, Mapping::EXP);
+            freq = fmap(fx_intensity, 0.5f, 1.f, Mapping::EXP);
 
-            fonepole(chorusFeedback, feedback, coeff);
-            fonepole(chorusDepth, depth, coeff);
-            fonepole(chorusFreq, freq, coeff);
+            fonepole(reverbFeedback, feedback, coeff);
+            fonepole(reverbDepth, depth, coeff);
+            fonepole(reverbFreq, freq, coeff);
 
-            chorus.SetDelayMs(6.f);
-            chorus.SetFeedback(chorusFeedback);
-            chorus.SetLfoDepth(chorusDepth);
-            chorus.SetLfoFreq(chorusFreq);
+            reverb.SetDelayMs(80.f);
+            reverb.SetFeedback(reverbFeedback);
+            reverb.SetLfoDepth(reverbDepth);
+            reverb.SetLfoFreq(reverbFreq);
             break;
         default:
             // shouldn't get here
@@ -99,10 +101,11 @@ public:
 
     void setVolume(float level, float drive, bool fs1)
     {
+        // TODO: take boost into account
         if (fs1) {
-            fonepole(volume, (level / (drive * 4.f + 1.f)), coeff);
+            fonepole(volume, (level / (drive * 4.f + 4.f)), 0.1f);
         } else {
-            volume = 1.f;
+            fonepole(volume, 1.f, 0.1f);
         }
     }
 
@@ -125,13 +128,13 @@ public:
                     delay.Write(output);
                     output = output * (1.2f - mix) + delay.Read() * mix;
                     break;
-                case EffectType::REVERB:
-                    mix = fmap(fx_intensity, 0.6f, 1.2f, Mapping::LINEAR);
+                case EffectType::AMBIENCE:
+                    mix = fmap(fx_intensity, 0.4f, 1.2f, Mapping::LINEAR);
                     output = output * (1.2f - mix) + reverb.Process(output) * mix;
                     break;
-                case EffectType::CHORUS:
-                    mix = fmap(fx_intensity, 0.6f, 1.3f, Mapping::LINEAR);
-                    output = output * (1.3f - mix) + chorus.Process(output) * mix;
+                case EffectType::REVERB:
+                    mix = fmap(fx_intensity, 0.5f, 1.2f, Mapping::LINEAR);
+                    output = output * (1.2f - mix) + reverb2.Process(output) * mix;
                     break;
                 default:
                     // shouldn't get here
@@ -164,12 +167,14 @@ private:
     EffectType fx_type;
 
     daisysp::ChorusEngine reverb;
-    daisysp::Chorus chorus;
+    Reverb reverb2;
+
+    // daisysp::Chorus chorus;
     daisysp::DelayLine<float, 48000> delay;
 
-    float chorusFeedback = 0.2f;
-    float chorusDepth = 0.1f;
-    float chorusFreq = 2.f;
+    // float chorusFeedback = 0.2f;
+    // float chorusDepth = 0.1f;
+    // float chorusFreq = 2.f;
 
     float reverbFeedback = 0.2f;
     float reverbDepth = 0.1f;
