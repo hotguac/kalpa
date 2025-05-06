@@ -1,6 +1,7 @@
 #ifndef REVERB_H
 #define REVERB_H
 
+#include "QuadratureOsc.h"
 #include "daisysp.h"
 #include "diffusor.h"
 
@@ -73,14 +74,14 @@ public:
         preDelay.Init();
         preDelay.SetDelay(mPreDelay);
 
-        diff1.Init(&lineDiff1);
-        diff2.Init(&lineDiff2);
-        diff3.Init(&lineDiff3);
-        diff4.Init(&lineDiff4);
-        diff5.Init(&lineDiff5);
-        diff6.Init(&lineDiff6);
-        diff7.Init(&lineDiff7);
-        diff8.Init(&lineDiff8);
+        earlyDiff1.Init(&lineDiff1);
+        earlyDiff2.Init(&lineDiff2);
+        earlyDiff3.Init(&lineDiff3);
+        earlyDiff4.Init(&lineDiff4);
+        leftTankDiff1.Init(&lineDiff5);
+        leftTankDiff2.Init(&lineDiff6);
+        rightTankDiff1.Init(&lineDiff7);
+        rightTankDiff2.Init(&lineDiff8);
 
         tank5.Init();
         tank5.SetDelay(static_cast<float>(sTankDelay5 - 2));
@@ -93,6 +94,8 @@ public:
 
         tank8.Init();
         tank8.SetDelay(static_cast<float>(sTankDelay8 - 2));
+
+        tankOsc.Init(1.0f, 96000.0f);
     }
 
    // Process a single sample
@@ -105,6 +108,7 @@ public:
         float leftTank = outputSample + mLastTank8 * mDecay;
         float rightTank = outputSample + mLastTank6 * mDecay;
 
+        tankOsc.update();
         mLastTank6 = ProcessLeftTank(leftTank);
         mLastTank8 = ProcessRightTank(rightTank);
 
@@ -143,28 +147,30 @@ public:
     };
 
 private:
+    QuadratureOscillator tankOsc;
+
     daisysp::DelayLine<float, sPreDelayLength> preDelay;
 
     // Input diffusion delay lines
-    Diffusor<float, sDiffuserDelay1 + 2> diff1;
-    Diffusor<float, sDiffuserDelay2 + 2> diff2;
-    Diffusor<float, sDiffuserDelay3 + 2> diff3;
-    Diffusor<float, sDiffuserDelay4 + 2> diff4;
+    Diffusor<float, sDiffuserDelay1 + 2> earlyDiff1;
+    Diffusor<float, sDiffuserDelay2 + 2> earlyDiff2;
+    Diffusor<float, sDiffuserDelay3 + 2> earlyDiff3;
+    Diffusor<float, sDiffuserDelay4 + 2> earlyDiff4;
 
     // Tank diffusion delay lines 5,6 left, 7,8 right
-    Diffusor<float, sDiffuserDelay5 + 2, sMaxExcursion, true> diff5;
+    Diffusor<float, sDiffuserDelay5 + 2, sMaxExcursion, true> leftTankDiff1;
     daisysp::DelayLine<float, sTankDelay5> tank5;
 
-    Diffusor<float, sDiffuserDelay6 + 2, 0, false> diff6;
+    Diffusor<float, sDiffuserDelay6 + 2, 0, false> leftTankDiff2;
     daisysp::DelayLine<float, sTankDelay6> tank6;
 
-    Diffusor<float, sDiffuserDelay7 + 2, sMaxExcursion, true> diff7;
+    Diffusor<float, sDiffuserDelay7 + 2, sMaxExcursion, true> rightTankDiff1;
     daisysp::DelayLine<float, sTankDelay7> tank7;
 
-    Diffusor<float, sDiffuserDelay8 + 2, 0, false> diff8;
+    Diffusor<float, sDiffuserDelay8 + 2, 0, false> rightTankDiff2;
     daisysp::DelayLine<float, sTankDelay8> tank8;
 
-    void updateCoefficients();
+    // void updateCoefficients();
 
     float mDecay;
     float mPreDelay;
@@ -201,10 +207,10 @@ private:
         mLastAccum1 = outputSample;
 
         // Apply input diffusion
-        outputSample = diff1.Process(outputSample, sDiffuserDelay1, mInputDiffusion1);
-        outputSample = diff2.Process(outputSample, sDiffuserDelay2, mInputDiffusion1);
-        outputSample = diff3.Process(outputSample, sDiffuserDelay3, mInputDiffusion2);
-        outputSample = diff4.Process(outputSample, sDiffuserDelay4, mInputDiffusion2);
+        outputSample = earlyDiff1.Process(outputSample, sDiffuserDelay1, mInputDiffusion1);
+        outputSample = earlyDiff2.Process(outputSample, sDiffuserDelay2, mInputDiffusion1);
+        outputSample = earlyDiff3.Process(outputSample, sDiffuserDelay3, mInputDiffusion2);
+        outputSample = earlyDiff4.Process(outputSample, sDiffuserDelay4, mInputDiffusion2);
 
         return outputSample;
     }
@@ -212,14 +218,15 @@ private:
     float ProcessLeftTank(float inputSample)
     {
         // Process the left tank (5,6)
-        float outputSample = diff5.Process(inputSample, sDiffuserDelay5, -mDecayDiffusion1);
+        leftTankDiff1.setExcursion(tankOsc.oscOut1());
+        float outputSample = leftTankDiff1.Process(inputSample, sDiffuserDelay5, -mDecayDiffusion1);
         tank5.Write(outputSample);
 
         outputSample = tank5.Read() * (1 - mDamping);
         outputSample = leftTankDamper.Process(outputSample, mDamping);
 
         outputSample *= mDecay;
-        outputSample = diff6.Process(outputSample, sDiffuserDelay6, mDecayDiffusion1);
+        outputSample = leftTankDiff2.Process(outputSample, sDiffuserDelay6, mDecayDiffusion1);
         tank6.Write(outputSample);
 
         return tank6.Read();
@@ -228,14 +235,15 @@ private:
     float ProcessRightTank(float inputSample)
     {
         // Process the right tank (7,8)
-        float outputSample = diff7.Process(inputSample, sDiffuserDelay7, -mDecayDiffusion2);
+        rightTankDiff1.setExcursion(tankOsc.oscOut2());
+        float outputSample = rightTankDiff1.Process(inputSample, sDiffuserDelay7, -mDecayDiffusion2);
         tank7.Write(outputSample);
 
         outputSample = tank7.Read() * (1 - mDamping);
         outputSample = rightTankDamper.Process(outputSample, mDamping);
 
         outputSample *= mDecay;
-        outputSample = diff8.Process(outputSample, sDiffuserDelay8, mDecayDiffusion2);
+        outputSample = rightTankDiff2.Process(outputSample, sDiffuserDelay8, mDecayDiffusion2);
         tank8.Write(outputSample);
 
         return tank8.Read();
@@ -245,10 +253,10 @@ private:
     {
         float leftOutput = tank7.Read(858) * 0.6f;
         leftOutput += tank7.Read(9593) * 0.6f;
-        leftOutput -= diff8.Read(6171) * 0.6f;
+        leftOutput -= rightTankDiff2.Read(6171) * 0.6f;
         leftOutput += tank8.Read(6438) * 0.6f;
         leftOutput -= tank5.Read(6419) * 0.6f;
-        leftOutput -= diff6.Read(603) * 0.6f;
+        leftOutput -= leftTankDiff2.Read(603) * 0.6f;
         leftOutput -= tank6.Read(3439) * 0.6f;
 
         return leftOutput;
@@ -258,10 +266,10 @@ private:
     {
         float RightOutput = tank5.Read(1139) * 0.6f;
         RightOutput += tank5.Read(11700) * 0.6f;
-        RightOutput -= diff6.Read(3961) * 0.6f;
+        RightOutput -= leftTankDiff2.Read(3961) * 0.6f;
         RightOutput += tank6.Read(8622) * 0.6f;
         RightOutput -= tank7.Read(6809) * 0.6f;
-        RightOutput -= diff8.Read(1081) * 0.6f;
+        RightOutput -= rightTankDiff2.Read(1081) * 0.6f;
         RightOutput -= tank8.Read(390) * 0.6f;
 
         return RightOutput;

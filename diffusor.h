@@ -18,11 +18,11 @@ public:
 
     void setExcursion(float excursion)
     {
-        //TODO: implement modulation using https://www.dsprelated.com/showarticle/1467.php
+        // parameter is normalized from -1.0 to 1.0
         if (MaxExcursion == 0) {
             mExcursion = 0.0f;
         } else {
-            mExcursion = daisysp::fmap(excursion, 0.0f, static_cast<float>(MaxExcursion));
+            mExcursion = daisysp::fmap((excursion + 1.0f) * 0.5f, 0.0f, static_cast<float>(MaxExcursion));
         }
     }
 
