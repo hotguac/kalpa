@@ -133,10 +133,11 @@ public:
                     output = output * (1.2f - mix) + reverb.Process(output) * mix;
                     break;
                 case EffectType::REVERB:
-                    mix = fmap(fx_intensity, 0.125f, 0.50f, Mapping::LINEAR);
+                    mix = fmap(fx_intensity, 0.1f, 0.40f, Mapping::LINEAR);
                     reverb2.setBandwidth(daisysp::fmap(fx_intensity, 0.25f, 0.65f, Mapping::EXP));
-                    reverb2.setDamping(1.0f - daisysp::fmap(fx_intensity, 0.4f, 0.6f, Mapping::EXP));
-                    reverb2.setDecay(daisysp::fmap(fx_intensity, 0.125f, 0.375f));
+                    reverb2.setDamping(1.0f - daisysp::fmap(fx_intensity, 0.3f, 0.6f, Mapping::EXP));
+                    reverb2.setDecay(daisysp::fmap(fx_intensity, 0.125f, 0.475f));
+                    reverb2.setPreDelay(fx_intensity);
                     output = output * (1.2f - mix) + reverb2.Process(output) * mix;
                     break;
                 default:
